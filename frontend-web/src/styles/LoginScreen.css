@@ -1,0 +1,222 @@
+.login-hero {
+  background: var(--color-sidebar-bg);
+  padding: 48px 40px 40px;
+}
+
+.login-hero-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-accent);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.login-hero-titulo {
+  font-size: 40px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+
+.login-hero-sub {
+  font-size: 14px;
+  color: rgba(255,255,255,0.5);
+}
+
+.login-body {
+  padding: 32px 40px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Botones sociales */
+.login-sociales {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.btn-social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: opacity 0.2s;
+  width: 100%;
+}
+
+.btn-social:hover {
+  opacity: 0.9;
+}
+
+.btn-google {
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  color: #1a1a1a;
+}
+
+.btn-apple {
+  background: #000000;
+  color: #ffffff;
+}
+
+.btn-facebook {
+  background: #1877F2;
+  color: #ffffff;
+}
+
+.btn-social-icono {
+  font-size: 18px;
+  width: 20px;
+  text-align: center;
+}
+
+/* Separador */
+.login-separador {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.login-separador-linea {
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.login-separador span {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* Inputs */
+.login-campos {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f5f2ec;
+  border-radius: 12px;
+  padding: 14px 16px;
+  border: 1.5px solid #d1f5e0;
+  transition: border-color 0.2s;
+}
+
+.input-wrapper:focus-within {
+  border-color: var(--color-accent);
+}
+
+.input-wrapper svg {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.input-wrapper input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  color: var(--color-text);
+  font-family: inherit;
+}
+
+.input-wrapper input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.btn-ojo {
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+}
+
+/* Olvidé contraseña */
+.login-olvide {
+  text-align: right;
+  margin-bottom: 20px;
+}
+
+.login-olvide a {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  transition: color 0.2s;
+}
+
+.login-olvide a:hover {
+  color: var(--color-accent);
+}
+
+/* Botón principal */
+.btn-login-principal {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--color-sidebar-bg);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background 0.2s;
+  margin-bottom: 20px;
+}
+
+.btn-login-principal:hover {
+  background: #1b4332;
+}
+
+/* Registro */
+.login-registro {
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+
+.login-registro a {
+  color: var(--color-text);
+  font-weight: 700;
+  transition: color 0.2s;
+}
+
+.login-registro a:hover {
+  color: var(--color-accent);
+}
+
+/* Error */
+.login-error {
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .login-hero {
+    padding: 32px 20px 28px;
+  }
+
+  .login-hero-titulo {
+    font-size: 28px;
+  }
+
+  .login-body {
+    padding: 24px 20px;
+  }
+}

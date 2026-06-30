@@ -1,0 +1,18 @@
+:root {
+  --sidebar-width: 220px;
+
+  /* Colores */
+  --color-sidebar-bg:     #0f1c14;
+  --color-sidebar-text:   #c8d8c0;
+  --color-sidebar-active: #ffffff;
+  --color-accent:         #52b788;
+  --color-accent-hover:   #40916c;
+  --color-bg-main:        #f5f2ec;
+  --color-text:           #1a1a1a;
+  --color-text-muted:     #6b7280;
+
+  /* Misc */
+  --radius-btn: 999px;
+  --radius-card: 14px;
+  --transition: 0.18s ease;
+}

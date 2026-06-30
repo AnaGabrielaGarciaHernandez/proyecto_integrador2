@@ -1,0 +1,264 @@
+/* ── Hero ── */
+.hero {
+  position: relative;
+  height: 420px;
+  overflow: hidden;
+}
+
+.hero-slide {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 1s ease;
+  z-index: 0;
+}
+
+.hero-slide.activo {
+  opacity: 1;
+}
+
+.hero-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1;
+}
+
+.hero-contenido {
+  position: absolute;
+  bottom: 60px;
+  left: 48px;
+  color: #fff;
+  z-index: 2;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.hero-etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  backdrop-filter: blur(4px);
+  z-index: 2;
+  position: relative;
+}
+
+/* ── Secciones ── */
+.home-seccion {
+  padding: 40px 40px 0;
+}
+
+.seccion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.seccion-titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.seccion-titulo span {
+  font-size: 22px;
+}
+
+.seccion-ver-todos {
+  font-size: 13px;
+  color: var(--color-accent);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.2s;
+}
+
+.seccion-ver-todos:hover {
+  color: var(--color-accent-hover);
+}
+
+/* ── Carrusel ── */
+.carrusel-wrapper {
+  position: relative;
+}
+
+.carrusel {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  max-width: 100%;
+  padding-bottom: 16px;
+  scroll-behavior: smooth;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.carrusel::-webkit-scrollbar {
+  display: none;
+}
+
+/* Dots */
+.carrusel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.carrusel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d1d5db;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s, width 0.2s;
+  padding: 0;
+}
+
+.carrusel-dot.activo {
+  background: var(--color-accent);
+  width: 20px;
+  border-radius: 999px;
+}
+
+/* ── Banner categoría ── */
+.banner-categoria {
+  margin: 40px 40px 0;
+  background: #ffffff;
+  border-radius: var(--radius-card);
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+}
+
+.banner-categoria:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.banner-categoria p {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.banner-categoria span {
+  font-size: 20px;
+  color: var(--color-text-muted);
+}
+
+/* ── Banner vender ── */
+.banner-vender {
+  margin: 24px 40px 40px;
+  background: #1a1a1a;
+  border-radius: var(--radius-card);
+  padding: 24px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.banner-vender-icono {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.banner-vender-texto {
+  flex: 1;
+}
+
+.banner-vender-texto h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 2px;
+}
+
+.banner-vender-texto p {
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+}
+
+.banner-vender-btn {
+  background: var(--color-accent);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.banner-vender-btn:hover {
+  background: var(--color-accent-hover);
+}
+
+.hero-titulo {
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -2px;
+  margin-bottom: 12px;
+  color: #ffffff;
+}
+
+.hero-titulo span {
+  color: var(--color-accent);
+}
+
+.hero-subtitulo {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 400;
+}
+
+@media (max-width: 768px) {
+  .banner-vender {
+    flex-wrap: wrap;
+    margin: 24px 16px 40px;
+  }
+
+  .banner-vender-texto h3 {
+    font-size: 13px;
+  }
+
+  .home-seccion {
+    padding: 30px 16px 0;
+  }
+
+  .banner-categoria {
+    margin: 30px 16px 0;
+  }
+
+  .hero-titulo {
+    font-size: 36px;
+  }
+
+  .hero-contenido {
+    left: 24px;
+    bottom: 40px;
+  }
+}

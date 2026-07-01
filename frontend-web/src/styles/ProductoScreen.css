@@ -392,3 +392,43 @@
   object-fit: contain;
   border-radius: 8px;
 }
+
+/* Layout dos columnas desktop */
+.producto-contenedor {
+  display: block;
+}
+
+.producto-info-derecha {
+  padding-bottom: 80px;
+}
+
+@media (min-width: 769px) {
+  .producto-contenedor {
+    display: flex;
+    align-items: flex-start;
+    min-height: 100vh;
+  }
+
+  .producto-hero {
+    position: sticky;
+    top: 0;
+    width: 50%;
+    height: 100vh;
+    flex-shrink: 0;
+  }
+
+  .producto-imagen {
+    height: 100vh;
+    object-position: center;
+  }
+
+  .producto-info-derecha {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 80px;
+  }
+
+  .producto-btn-fijo {
+    left: calc(var(--sidebar-width) + (100% - var(--sidebar-width)) / 2);
+  }
+}

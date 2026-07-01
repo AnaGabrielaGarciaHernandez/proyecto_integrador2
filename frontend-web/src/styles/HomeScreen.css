@@ -116,27 +116,34 @@
 }
 
 /* Dots */
+/* Barra de scroll */
 .carrusel-dots {
+  display: none;
+}
+
+.carrusel {
   display: flex;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 16px;
+  gap: 16px;
+  overflow-x: auto;
+  max-width: 100%;
+  padding-bottom: 12px;
+  scroll-behavior: smooth;
+  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) #e5e7eb;
 }
 
-.carrusel-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #d1d5db;
-  border: none;
-  cursor: pointer;
-  transition: background 0.2s, width 0.2s;
-  padding: 0;
+.carrusel::-webkit-scrollbar {
+  height: 4px;
 }
 
-.carrusel-dot.activo {
+.carrusel::-webkit-scrollbar-track {
+  background: #e5e7eb;
+  border-radius: 999px;
+}
+
+.carrusel::-webkit-scrollbar-thumb {
   background: var(--color-accent);
-  width: 20px;
   border-radius: 999px;
 }
 

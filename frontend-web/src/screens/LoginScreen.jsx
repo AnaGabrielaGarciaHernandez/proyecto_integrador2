@@ -32,7 +32,6 @@ export default function LoginScreen() {
   return (
     <div>
       <div className="login-hero">
-        <p className="login-hero-label">EcoBazar</p>
         <h1 className="login-hero-titulo">Bienvenido<br />de vuelta.</h1>
         <p className="login-hero-sub">Inicia sesión para continuar explorando</p>
       </div>

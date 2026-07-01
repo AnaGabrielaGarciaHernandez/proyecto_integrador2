@@ -1,0 +1,196 @@
+/* Reutiliza los mismos estilos del login */
+@import './LoginScreen.css';
+
+.registro-hero {
+  background: var(--color-sidebar-bg);
+  padding: 48px 40px 40px;
+}
+
+.registro-hero-titulo {
+  font-size: 40px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+
+.registro-hero-sub {
+  font-size: 14px;
+  color: rgba(255,255,255,0.5);
+}
+
+.registro-body {
+  padding: 32px 40px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.registro-terminos {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.registro-terminos a {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+
+.registro-login {
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-top: 16px;
+}
+
+.registro-login a {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+/* ── Paso 2: Emoji ── */
+.emoji-hero {
+  background: var(--color-sidebar-bg);
+  padding: 48px 40px 32px;
+}
+
+.emoji-hero h1 {
+  font-size: 36px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.emoji-hero p {
+  font-size: 14px;
+  color: rgba(255,255,255,0.5);
+}
+
+.emoji-body {
+  padding: 32px 40px;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.emoji-item {
+  aspect-ratio: 1;
+  border-radius: 16px;
+  background: #f5f2ec;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.emoji-item:hover {
+  background: #e8f5e9;
+  transform: scale(1.05);
+}
+
+.emoji-item.seleccionado {
+  background: var(--color-sidebar-bg);
+  border-color: var(--color-accent);
+}
+
+.emoji-preview {
+  background: #f5f2ec;
+  border-radius: 14px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.emoji-preview-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--color-sidebar-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.emoji-preview-info p {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.emoji-preview-info span {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.btn-confirmar {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--color-sidebar-bg);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.btn-confirmar:hover {
+  background: #1b4332;
+}
+
+/* Toast bienvenida */
+.toast-bienvenida {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-sidebar-bg);
+  color: #ffffff;
+  padding: 14px 28px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 999;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .registro-hero {
+    padding-top: 64px;
+  }
+  .registro-body {
+    padding: 24px 20px;
+  }
+  .emoji-body {
+    padding: 24px 16px;
+  }
+  .emoji-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .emoji-hero {
+    padding: 32px 20px 24px;
+  }
+}

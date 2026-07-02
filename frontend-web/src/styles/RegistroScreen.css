@@ -92,13 +92,14 @@
 }
 
 .emoji-item:hover {
-  background: #e8f5e9;
+  background: #ace6b0;
   transform: scale(1.05);
 }
 
 .emoji-item.seleccionado {
-  background: var(--color-sidebar-bg);
-  border-color: var(--color-accent);
+  background: #508b54;
+  border-color: #003804;
+  box-shadow: 0 0 0 4px rgba(0,56,4,0.2);
 }
 
 .emoji-preview {
@@ -115,7 +116,7 @@
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: var(--color-sidebar-bg);
+  background: #508b54;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -202,3 +202,13 @@
 .btn-cerrar-sesion:hover {
   background: rgba(239, 68, 68, 0.25);
 }
+
+.carrito-badge {
+  background: #f97316;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  margin-left: auto;
+}

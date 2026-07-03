@@ -432,3 +432,48 @@
     left: calc(var(--sidebar-width) + (100% - var(--sidebar-width)) / 2);
   }
 }
+
+/* Toast de carrito */
+.toast-carrito {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: #fff;
+  padding: 14px 22px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  animation: toastEntrada 0.3s ease;
+}
+
+.toast-carrito svg {
+  color: #22c55e;
+}
+
+@keyframes toastEntrada {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (max-width: 768px) {
+  .toast-carrito {
+    bottom: 80px;
+    left: 50%;
+    width: calc(100% - 32px);
+    justify-content: center;
+  }
+}

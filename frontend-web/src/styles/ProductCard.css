@@ -198,3 +198,9 @@
 .btn-carrito:hover {
   background: var(--color-accent);
 }
+
+.btn-carrito {
+  position: relative;
+  z-index: 10;
+  pointer-events: all;
+}

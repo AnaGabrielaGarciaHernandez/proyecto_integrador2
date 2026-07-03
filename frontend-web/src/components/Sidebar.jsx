@@ -1,15 +1,45 @@
+import { useState, useEffect } from 'react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import {
-  Home, Grid2x2, ShoppingCart, User,
-  Sparkles, Tag, Headphones, HelpCircle,
-  LogOut, Users, Package, BarChart2
+  Home,
+  Grid2x2,
+  ShoppingCart,
+  User,
+  Sparkles,
+  Tag,
+  Headphones,
+  HelpCircle,
+  LogOut,
+  Users,
+  Package,
+  BarChart2
 } from 'lucide-react'
+
+import { contarItems } from '../services/carrito'
+
 import '../styles/Sidebar.css'
 
 export default function Sidebar({ abierto, onCerrar }) {
   const navigate = useNavigate()
+
   const usuarioGuardado = localStorage.getItem('usuario')
   const usuario = usuarioGuardado ? JSON.parse(usuarioGuardado) : null
+
+  const [itemsCarrito, setItemsCarrito] = useState(0)
+
+  useEffect(() => {
+    function actualizar() {
+      setItemsCarrito(contarItems())
+    }
+
+    actualizar()
+
+    window.addEventListener('carritoActualizado', actualizar)
+
+    return () => {
+      window.removeEventListener('carritoActualizado', actualizar)
+    }
+  }, [])
 
   function handleCerrarSesion() {
     localStorage.removeItem('usuario')
@@ -23,7 +53,9 @@ export default function Sidebar({ abierto, onCerrar }) {
 
       <aside className={`sidebar ${abierto ? 'sidebar-abierto' : ''}`}>
 
-        <button className="sidebar-cerrar" onClick={onCerrar}>✕</button>
+        <button className="sidebar-cerrar" onClick={onCerrar}>
+          ✕
+        </button>
 
         <div className="sidebar-logo">
           <span className="logo-eco">Eco</span>
@@ -31,88 +63,236 @@ export default function Sidebar({ abierto, onCerrar }) {
           <p className="logo-sub">Moda circular · Durango</p>
         </div>
 
-        {/* Nav principal — igual para todos */}
         <nav className="sidebar-nav">
-          <NavLink to="/" end onClick={onCerrar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-            <Home size={17} /> Inicio
+
+          <NavLink
+            to="/"
+            end
+            onClick={onCerrar}
+            className={({ isActive }) =>
+              isActive ? 'nav-item active' : 'nav-item'
+            }
+          >
+            <Home size={17} />
+            Inicio
           </NavLink>
-          <NavLink to="/explorar" onClick={onCerrar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-            <Grid2x2 size={17} /> Explorar
+
+          <NavLink
+            to="/explorar"
+            onClick={onCerrar}
+            className={({ isActive }) =>
+              isActive ? 'nav-item active' : 'nav-item'
+            }
+          >
+            <Grid2x2 size={17} />
+            Explorar
           </NavLink>
-          <NavLink to="/carrito" onClick={onCerrar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-            <ShoppingCart size={17} /> Carrito
+
+          <NavLink
+            to="/carrito"
+            onClick={onCerrar}
+            className={({ isActive }) =>
+              isActive ? 'nav-item active' : 'nav-item'
+            }
+          >
+            <ShoppingCart size={17} />
+            Carrito
+
+            {itemsCarrito > 0 && (
+              <span className="carrito-badge">
+                {itemsCarrito}
+              </span>
+            )}
           </NavLink>
-          <NavLink to="/cuenta" onClick={onCerrar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-            <User size={17} /> Mi cuenta
+
+          <NavLink
+            to="/cuenta"
+            onClick={onCerrar}
+            className={({ isActive }) =>
+              isActive ? 'nav-item active' : 'nav-item'
+            }
+          >
+            <User size={17} />
+            Mi cuenta
           </NavLink>
+
         </nav>
 
         <div className="sidebar-divider" />
 
-        {/* Nav secundaria según rol */}
         <nav className="sidebar-nav">
-          <NavLink to="/recientes" onClick={onCerrar} className={({ isActive }) => isActive ? 'nav-item nav-item-sm active' : 'nav-item nav-item-sm'}>
-            <Sparkles size={15} /> Recién llegados
+
+          <NavLink
+            to="/recientes"
+            onClick={onCerrar}
+            className={({ isActive }) =>
+              isActive
+                ? 'nav-item nav-item-sm active'
+                : 'nav-item nav-item-sm'
+            }
+          >
+            <Sparkles size={15} />
+            Recién llegados
           </NavLink>
 
-          {/* Admin */}
-          {usuario?.rol === 'admin' && <>
-            <NavLink to="/admin/vendedores" onClick={onCerrar} className={({ isActive }) => isActive ? 'nav-item nav-item-sm active' : 'nav-item nav-item-sm'}>
-              <Users size={15} /> Gestionar vendedores
-            </NavLink>
-            <NavLink to="/admin/productos" onClick={onCerrar} className={({ isActive }) => isActive ? 'nav-item nav-item-sm active' : 'nav-item nav-item-sm'}>
-              <Package size={15} /> Gestionar productos
-            </NavLink>
-            <NavLink to="/admin/reportes" onClick={onCerrar} className={({ isActive }) => isActive ? 'nav-item nav-item-sm active' : 'nav-item nav-item-sm'}>
-              <BarChart2 size={15} /> Reportes
-            </NavLink>
-          </>}
+          {usuario?.rol === 'admin' && (
+            <>
+              <NavLink
+                to="/admin/vendedores"
+                onClick={onCerrar}
+                className={({ isActive }) =>
+                  isActive
+                    ? 'nav-item nav-item-sm active'
+                    : 'nav-item nav-item-sm'
+                }
+              >
+                <Users size={15} />
+                Gestionar vendedores
+              </NavLink>
 
-          {/* Cliente y Vendedor */}
-          {(usuario?.rol === 'cliente' || usuario?.rol === 'vendedor') && <>
-            <NavLink to="/vender" onClick={onCerrar} className={({ isActive }) => isActive ? 'nav-item nav-item-sm active' : 'nav-item nav-item-sm'}>
-              <Tag size={15} /> Publicar prenda
-            </NavLink>
-          </>}
+              <NavLink
+                to="/admin/productos"
+                onClick={onCerrar}
+                className={({ isActive }) =>
+                  isActive
+                    ? 'nav-item nav-item-sm active'
+                    : 'nav-item nav-item-sm'
+                }
+              >
+                <Package size={15} />
+                Gestionar productos
+              </NavLink>
 
-          {/* Invitado */}
-          {!usuario && <>
-            <NavLink to="/vender" onClick={onCerrar} className={({ isActive }) => isActive ? 'nav-item nav-item-sm active' : 'nav-item nav-item-sm'}>
-              <Tag size={15} /> Quiero vender
-            </NavLink>
-          </>}
+              <NavLink
+                to="/admin/reportes"
+                onClick={onCerrar}
+                className={({ isActive }) =>
+                  isActive
+                    ? 'nav-item nav-item-sm active'
+                    : 'nav-item nav-item-sm'
+                }
+              >
+                <BarChart2 size={15} />
+                Reportes
+              </NavLink>
+            </>
+          )}
 
-          <NavLink to="/soporte" onClick={onCerrar} className={({ isActive }) => isActive ? 'nav-item nav-item-sm active' : 'nav-item nav-item-sm'}>
-            <Headphones size={15} /> Atención al cliente
+          {(usuario?.rol === 'cliente' ||
+            usuario?.rol === 'vendedor') && (
+            <NavLink
+              to="/vender"
+              onClick={onCerrar}
+              className={({ isActive }) =>
+                isActive
+                  ? 'nav-item nav-item-sm active'
+                  : 'nav-item nav-item-sm'
+              }
+            >
+              <Tag size={15} />
+              Publicar prenda
+            </NavLink>
+          )}
+
+          {!usuario && (
+            <NavLink
+              to="/vender"
+              onClick={onCerrar}
+              className={({ isActive }) =>
+                isActive
+                  ? 'nav-item nav-item-sm active'
+                  : 'nav-item nav-item-sm'
+              }
+            >
+              <Tag size={15} />
+              Quiero vender
+            </NavLink>
+          )}
+
+          <NavLink
+            to="/soporte"
+            onClick={onCerrar}
+            className={({ isActive }) =>
+              isActive
+                ? 'nav-item nav-item-sm active'
+                : 'nav-item nav-item-sm'
+            }
+          >
+            <Headphones size={15} />
+            Atención al cliente
           </NavLink>
-          <NavLink to="/faq" onClick={onCerrar} className={({ isActive }) => isActive ? 'nav-item nav-item-sm active' : 'nav-item nav-item-sm'}>
-            <HelpCircle size={15} /> Preguntas frecuentes
+
+          <NavLink
+            to="/faq"
+            onClick={onCerrar}
+            className={({ isActive }) =>
+              isActive
+                ? 'nav-item nav-item-sm active'
+                : 'nav-item nav-item-sm'
+            }
+          >
+            <HelpCircle size={15} />
+            Preguntas frecuentes
           </NavLink>
+
         </nav>
 
-        {/* Footer según rol */}
         <div className="sidebar-auth">
+
           {usuario ? (
             <>
               <div className="sidebar-usuario">
+
                 <div className="sidebar-usuario-avatar">
-                  <User size={18} color="#fff" />
+                  {usuario.emoji ? (
+                    <span style={{ fontSize: '18px' }}>
+                      {usuario.emoji}
+                    </span>
+                  ) : (
+                    <User size={18} color="#fff" />
+                  )}
                 </div>
+
                 <div className="sidebar-usuario-info">
-                  <p className="sidebar-usuario-nombre">{usuario.nombre}</p>
-                  <p className="sidebar-usuario-rol">{usuario.rol}</p>
+                  <p className="sidebar-usuario-nombre">
+                    {usuario.nombre}
+                  </p>
+
+                  <p className="sidebar-usuario-rol">
+                    {usuario.rol}
+                  </p>
                 </div>
+
               </div>
-              <button className="btn-cerrar-sesion" onClick={handleCerrarSesion}>
-                <LogOut size={14} /> Cerrar sesión
+
+              <button
+                className="btn-cerrar-sesion"
+                onClick={handleCerrarSesion}
+              >
+                <LogOut size={14} />
+                Cerrar sesión
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" onClick={onCerrar} className="btn-login">Iniciar sesión</Link>
-              <Link to="/registro" onClick={onCerrar} className="btn-register">Crear cuenta</Link>
+              <Link
+                to="/login"
+                onClick={onCerrar}
+                className="btn-login"
+              >
+                Iniciar sesión
+              </Link>
+
+              <Link
+                to="/registro"
+                onClick={onCerrar}
+                className="btn-register"
+              >
+                Crear cuenta
+              </Link>
             </>
           )}
+
         </div>
 
       </aside>

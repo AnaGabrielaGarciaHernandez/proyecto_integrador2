@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Sparkles, Flame, RefreshCw, ChevronRight } from 'lucide-react'
+import { Sparkles, Flame, RefreshCw, ChevronRight, ShoppingCart } from 'lucide-react'
 import ProductCard from '../components/ProductCard'
 import { productosRecientes, productosVistos } from '../data/productos'
 import '../styles/HomeScreen.css'
@@ -45,31 +45,14 @@ function Hero() {
   )
 }
 
-function Carrusel({ productos }) {
+function Carrusel({ productos, onAgregar }) {
   const ref = useRef(null)
-  const [dotActivo, setDotActivo] = useState(0)
-  const totalDots = Math.ceil(productos.length / 2)
-
-  function irADot(i) {
-    const cardWidth = 236
-    ref.current.scrollLeft = i * cardWidth * 2
-    setDotActivo(i)
-  }
 
   return (
     <div className="carrusel-wrapper">
       <div className="carrusel" ref={ref}>
         {productos.map(p => (
-          <ProductCard key={p.id} producto={p} />
-        ))}
-      </div>
-      <div className="carrusel-dots">
-        {Array.from({ length: totalDots }).map((_, i) => (
-          <button
-            key={i}
-            className={`carrusel-dot ${i === dotActivo ? 'activo' : ''}`}
-            onClick={() => irADot(i)}
-          />
+          <ProductCard key={p.id} producto={p} onAgregar={onAgregar} />
         ))}
       </div>
     </div>
@@ -77,9 +60,24 @@ function Carrusel({ productos }) {
 }
 
 export default function HomeScreen() {
+  const [toast, setToast] = useState(null)
+
+  function handleAgregar(nombre) {
+    setToast(nombre)
+    setTimeout(() => setToast(null), 2500)
+  }
+
   return (
     <div>
       <Hero />
+
+      {toast && (
+        <div className="toast-carrito">
+          <ShoppingCart size={16} /> Agregado: {toast}
+        </div>
+      )}
+
+      {/* resto igual */}
 
       <div className="home-seccion">
         <div className="seccion-header">
@@ -90,7 +88,7 @@ export default function HomeScreen() {
             Ver todos <ChevronRight size={14} />
           </Link>
         </div>
-        <Carrusel productos={productosRecientes} />
+        <Carrusel productos={productosRecientes} onAgregar={handleAgregar} />
       </div>
 
       <div className="home-seccion">
@@ -102,7 +100,7 @@ export default function HomeScreen() {
             Ver todos <ChevronRight size={14} />
           </Link>
         </div>
-        <Carrusel productos={productosVistos} />
+        <Carrusel productos={productosVistos} onAgregar={handleAgregar} />
       </div>
 
       <Link to="/explorar" className="banner-categoria">

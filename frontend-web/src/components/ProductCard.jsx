@@ -1,8 +1,11 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Heart, ShoppingCart, User } from 'lucide-react'
+import { useAuth } from '../context/useAuth'
 import '../styles/ProductCard.css'
 
-export default function ProductCard({ producto }) {
+export default function ProductCard({ producto, onAgregar }) {
+  const navigate = useNavigate()
+  const { user } = useAuth()
   const {
     id,
     imagen,
@@ -15,7 +18,25 @@ export default function ProductCard({ producto }) {
     talla,
     precio,
     precioOriginal,
+    varianteDisponible,
+    totalStock,
   } = producto
+
+  async function handleAgregar(e) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!user) {
+      navigate('/login')
+      return
+    }
+
+    if (!varianteDisponible?.id || totalStock <= 0) return
+
+    if (onAgregar) {
+      await onAgregar(producto)
+    }
+  }
 
   return (
     <Link to={`/producto/${id}`} className="product-card">
@@ -43,7 +64,7 @@ export default function ProductCard({ producto }) {
 
         {/* Condición */}
         <div className="card-condicion">
-          <span className={`badge-condicion badge-condicion--${condicion.toLowerCase().replace(' ', '-')}`}>
+          <span className={`badge-condicion badge-condicion--${condicion.toLowerCase().replaceAll(' ', '-')}`}>
             ● {condicion}
           </span>
         </div>
@@ -68,7 +89,11 @@ export default function ProductCard({ producto }) {
                 <span className="precio-original">${precioOriginal}</span>
               )}
             </div>
-            <button className="btn-carrito" onClick={(e) => e.preventDefault()}>
+            <button
+              className="btn-carrito"
+              onClick={handleAgregar}
+              disabled={!varianteDisponible?.id || totalStock <= 0}
+            >
               <ShoppingCart size={15} />
             </button>
           </div>

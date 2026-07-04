@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -13,41 +13,90 @@ import {
   ZoomIn
 } from 'lucide-react'
 
-import { productos } from '../data/productos'
 import { agregarAlCarrito } from '../services/carrito'
+import { getProduct } from '../services/products'
+import { useAuth } from '../context/useAuth'
 
 import '../styles/ProductoScreen.css'
 
 export default function ProductoScreen() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [imagenAbierta, setImagenAbierta] = useState(false)
   const [toast, setToast] = useState(false)
+  const [producto, setProducto] = useState(null)
+  const [varianteId, setVarianteId] = useState('')
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState('')
+  const [agregando, setAgregando] = useState(false)
 
-  const producto = productos.find(p => p.id === Number(id))
+  useEffect(() => {
+    let mounted = true
 
-  if (!producto) {
+    getProduct(id)
+      .then((product) => {
+        if (!mounted) return
+        setProducto(product)
+        setVarianteId(product.varianteDisponible?.id || '')
+      })
+      .catch((err) => {
+        if (mounted) setError(err.message || 'Producto no encontrado.')
+      })
+      .finally(() => {
+        if (mounted) setCargando(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [id])
+
+  if (cargando) {
     return (
       <div style={{ padding: '40px', textAlign: 'center' }}>
-        <p>Producto no encontrado.</p>
+        <p>Cargando producto...</p>
       </div>
     )
   }
 
-  function handleAgregar() {
-    agregarAlCarrito(producto)
-
-    setToast(true)
-
-    setTimeout(() => {
-      setToast(false)
-    }, 2200)
+  if (!producto) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <p>{error || 'Producto no encontrado.'}</p>
+      </div>
+    )
   }
 
-  const ahorro = Math.round(
-    ((producto.precioOriginal - producto.precio) / producto.precioOriginal) * 100
-  )
+  async function handleAgregar() {
+    if (!user) {
+      navigate('/login')
+      return
+    }
+
+    if (!varianteId) return
+
+    try {
+      setAgregando(true)
+      await agregarAlCarrito(varianteId)
+      setToast(true)
+
+      setTimeout(() => {
+        setToast(false)
+      }, 2200)
+    } catch (err) {
+      setError(err.message || 'No se pudo agregar al carrito.')
+    } finally {
+      setAgregando(false)
+    }
+  }
+
+  const varianteSeleccionada = producto.variants.find((variant) => variant.id === varianteId)
+
+  const ahorro = producto.precioOriginal > 0
+    ? Math.round(((producto.precioOriginal - producto.precio) / producto.precioOriginal) * 100)
+    : 0
 
   return (
     <div className="producto-contenedor">
@@ -108,7 +157,7 @@ export default function ProductoScreen() {
           <span
             className={`badge-condicion badge-condicion--${producto.condicion
               .toLowerCase()
-              .replace(' ', '-')}`}
+              .replaceAll(' ', '-')}`}
           >
             ● {producto.condicion}
           </span>
@@ -156,9 +205,21 @@ export default function ProductoScreen() {
             <div className="producto-talla-box">
               <p className="producto-talla-label">Talla</p>
 
-              <div className="producto-talla-valor">
-                {producto.talla}
-              </div>
+              <select
+                className="producto-talla-valor"
+                value={varianteId}
+                onChange={(e) => setVarianteId(e.target.value)}
+              >
+                {producto.variants.map((variant) => (
+                  <option
+                    key={variant.id}
+                    value={variant.id}
+                    disabled={variant.stock <= 0}
+                  >
+                    {variant.size_name} · {variant.stock} disp.
+                  </option>
+                ))}
+              </select>
             </div>
 
           </div>
@@ -251,12 +312,15 @@ export default function ProductoScreen() {
 
         </div>
 
+        {error && <div className="login-error">{error}</div>}
+
         <button
           className="producto-btn-fijo"
           onClick={handleAgregar}
+          disabled={agregando || !varianteSeleccionada || varianteSeleccionada.stock <= 0}
         >
           <ShoppingCart size={20} />
-          Agregar al carrito • ${producto.precio}
+          {agregando ? 'Agregando...' : `Agregar al carrito • $${producto.precio}`}
         </button>
 
       </div>

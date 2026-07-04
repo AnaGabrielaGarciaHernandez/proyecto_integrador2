@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Sparkles, Flame, RefreshCw, ChevronRight, ShoppingCart } from 'lucide-react'
 import ProductCard from '../components/ProductCard'
-import { productosRecientes, productosVistos } from '../data/productos'
+import { getProducts } from '../services/products'
+import { agregarAlCarrito } from '../services/carrito'
 import '../styles/HomeScreen.css'
 
 const heroSlides = [
@@ -61,11 +62,42 @@ function Carrusel({ productos, onAgregar }) {
 
 export default function HomeScreen() {
   const [toast, setToast] = useState(null)
+  const [productos, setProductos] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState('')
 
-  function handleAgregar(nombre) {
-    setToast(nombre)
-    setTimeout(() => setToast(null), 2500)
+  useEffect(() => {
+    let mounted = true
+
+    getProducts({ limit: 12 })
+      .then(({ products }) => {
+        if (mounted) setProductos(products)
+      })
+      .catch((err) => {
+        if (mounted) setError(err.message || 'No se pudieron cargar productos.')
+      })
+      .finally(() => {
+        if (mounted) setCargando(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  async function handleAgregar(producto) {
+    try {
+      setError('')
+      await agregarAlCarrito(producto.varianteDisponible.id)
+      setToast(producto.nombre)
+      setTimeout(() => setToast(null), 2500)
+    } catch (err) {
+      setError(err.message || 'No se pudo agregar al carrito.')
+    }
   }
+
+  const productosRecientes = productos.slice(0, 6)
+  const productosVistos = productos.slice(6, 12)
 
   return (
     <div>
@@ -76,6 +108,9 @@ export default function HomeScreen() {
           <ShoppingCart size={16} /> Agregado: {toast}
         </div>
       )}
+
+      {error && <div className="login-error">{error}</div>}
+      {cargando && <div style={{ padding: '24px' }}>Cargando productos...</div>}
 
       {/* resto igual */}
 

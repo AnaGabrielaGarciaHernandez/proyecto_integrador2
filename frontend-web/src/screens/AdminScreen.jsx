@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Users, ShoppingBag, Flag, Shield,
+  Users, ShoppingBag, Flag,
   ChevronDown, ChevronUp, CheckCircle,
   XCircle, PauseCircle, MessageSquare,
   Trash2, Clock
@@ -98,12 +98,6 @@ const statusVendedor = {
 
 export default function AdminScreen() {
   const location = useLocation()
-  const tabInicial = location.pathname.includes('productos')
-    ? 'productos'
-    : location.pathname.includes('reportes')
-    ? 'reportes'
-    : 'vendedores'
-
   const navigate = useNavigate()
   const tab = location.pathname.includes('productos')
     ? 'productos'

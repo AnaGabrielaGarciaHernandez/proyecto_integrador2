@@ -17,13 +17,32 @@ import {
 import "../styles/CarritoScreen.css";
 
 const ENVIO = 49;
+const ENVIO_CENTAVOS = ENVIO * 100;
 
 export default function CarritoScreen() {
   const [items, setItems] = useState([]);
+  const [subtotalCentavos, setSubtotalCentavos] = useState(0);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const actualizar = () => {
-      setItems(getCarrito());
+    let mounted = true;
+
+    const actualizar = async () => {
+      try {
+        setError("");
+        const cart = await getCarrito();
+        if (!mounted) return;
+        setItems(cart.items);
+        setSubtotalCentavos(cart.subtotalCentavos);
+      } catch (err) {
+        if (!mounted) return;
+        setError(err.message || "No se pudo cargar el carrito.");
+        setItems([]);
+        setSubtotalCentavos(0);
+      } finally {
+        if (mounted) setCargando(false);
+      }
     };
 
     actualizar();
@@ -31,24 +50,34 @@ export default function CarritoScreen() {
     window.addEventListener("carritoActualizado", actualizar);
 
     return () => {
+      mounted = false;
       window.removeEventListener("carritoActualizado", actualizar);
     };
   }, []);
 
-  function handleEliminar(id) {
-    eliminarDelCarrito(id);
+  async function handleEliminar(id) {
+    try {
+      const cart = await eliminarDelCarrito(id);
+      setItems(cart.items);
+      setSubtotalCentavos(cart.subtotalCentavos);
+    } catch (err) {
+      setError(err.message || "No se pudo eliminar el producto.");
+    }
   }
 
-  function handleCantidad(id, delta) {
-    cambiarCantidad(id, delta);
+  async function handleCantidad(item, delta) {
+    const nextQuantity = Math.max(1, item.cantidad + delta);
+    try {
+      const cart = await cambiarCantidad(item.id, nextQuantity);
+      setItems(cart.items);
+      setSubtotalCentavos(cart.subtotalCentavos);
+    } catch (err) {
+      setError(err.message || "No se pudo actualizar la cantidad.");
+    }
   }
 
-  const subtotal = items.reduce(
-    (sum, item) => sum + item.precio * item.cantidad,
-    0
-  );
-
-  const total = subtotal + (items.length ? ENVIO : 0);
+  const subtotal = Math.round(subtotalCentavos / 100);
+  const total = Math.round((subtotalCentavos + (items.length ? ENVIO_CENTAVOS : 0)) / 100);
 
   return (
     <div>
@@ -62,7 +91,13 @@ export default function CarritoScreen() {
         </p>
       </div>
 
-      {items.length === 0 ? (
+      {error && <div className="login-error">{error}</div>}
+
+      {cargando ? (
+        <div className="carrito-vacio">
+          <p>Cargando carrito...</p>
+        </div>
+      ) : items.length === 0 ? (
         <div className="carrito-vacio">
           <ShoppingBag size={56} strokeWidth={1} />
 
@@ -104,7 +139,7 @@ export default function CarritoScreen() {
                 <div className="carrito-item-controles">
                   <button
                     className="carrito-btn-cantidad"
-                    onClick={() => handleCantidad(item.id, -1)}
+                    onClick={() => handleCantidad(item, -1)}
                   >
                     <Minus size={12} />
                   </button>
@@ -115,7 +150,8 @@ export default function CarritoScreen() {
 
                   <button
                     className="carrito-btn-cantidad"
-                    onClick={() => handleCantidad(item.id, 1)}
+                    onClick={() => handleCantidad(item, 1)}
+                    disabled={item.cantidad >= item.stock}
                   >
                     <Plus size={12} />
                   </button>

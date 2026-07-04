@@ -16,35 +16,44 @@ import {
 } from 'lucide-react'
 
 import { contarItems } from '../services/carrito'
+import { useAuth } from '../context/useAuth'
 
 import '../styles/Sidebar.css'
 
 export default function Sidebar({ abierto, onCerrar }) {
   const navigate = useNavigate()
-
-  const usuarioGuardado = localStorage.getItem('usuario')
-  const usuario = usuarioGuardado ? JSON.parse(usuarioGuardado) : null
+  const { user: usuario, logout } = useAuth()
 
   const [itemsCarrito, setItemsCarrito] = useState(0)
 
   useEffect(() => {
-    function actualizar() {
-      setItemsCarrito(contarItems())
+    async function actualizar() {
+      if (!usuario) {
+        setItemsCarrito(0)
+        return
+      }
+
+      try {
+        setItemsCarrito(await contarItems())
+      } catch {
+        setItemsCarrito(0)
+      }
     }
 
     actualizar()
 
     window.addEventListener('carritoActualizado', actualizar)
+    window.addEventListener('authActualizado', actualizar)
 
     return () => {
       window.removeEventListener('carritoActualizado', actualizar)
+      window.removeEventListener('authActualizado', actualizar)
     }
-  }, [])
+  }, [usuario])
 
-  function handleCerrarSesion() {
-    localStorage.removeItem('usuario')
+  async function handleCerrarSesion() {
+    await logout()
     navigate('/')
-    window.location.reload()
   }
 
   return (
@@ -135,7 +144,7 @@ export default function Sidebar({ abierto, onCerrar }) {
             Recién llegados
           </NavLink>
 
-          {usuario?.rol === 'admin' && (
+          {usuario?.role === 'admin' && (
             <>
               <NavLink
                 to="/admin/vendedores"
@@ -178,8 +187,8 @@ export default function Sidebar({ abierto, onCerrar }) {
             </>
           )}
 
-          {(usuario?.rol === 'cliente' ||
-            usuario?.rol === 'vendedor') && (
+          {(usuario?.role === 'cliente' ||
+            usuario?.role === 'vendedor') && (
             <NavLink
               to="/vender"
               onClick={onCerrar}
@@ -244,22 +253,16 @@ export default function Sidebar({ abierto, onCerrar }) {
               <div className="sidebar-usuario">
 
                 <div className="sidebar-usuario-avatar">
-                  {usuario.emoji ? (
-                    <span style={{ fontSize: '18px' }}>
-                      {usuario.emoji}
-                    </span>
-                  ) : (
-                    <User size={18} color="#fff" />
-                  )}
+                  <User size={18} color="#fff" />
                 </div>
 
                 <div className="sidebar-usuario-info">
                   <p className="sidebar-usuario-nombre">
-                    {usuario.nombre}
+                    {usuario.full_name}
                   </p>
 
                   <p className="sidebar-usuario-rol">
-                    {usuario.rol}
+                    {usuario.role}
                   </p>
                 </div>
 

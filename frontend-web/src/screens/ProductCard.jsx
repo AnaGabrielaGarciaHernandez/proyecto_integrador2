@@ -1,10 +1,12 @@
 import { Heart, ShoppingCart } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { agregarAlCarrito } from '../services/carrito'
+import { useAuth } from '../context/useAuth'
 import '../styles/ProductCard.css'
 
 export default function ProductCard({ producto, onAgregar }) {
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const {
     id,
@@ -16,7 +18,9 @@ export default function ProductCard({ producto, onAgregar }) {
     vendedor,
     talla,
     condicion,
-    tipo
+    tipo,
+    varianteDisponible,
+    totalStock,
   } = producto
 
   const descuento = Math.round(
@@ -27,11 +31,18 @@ export default function ProductCard({ producto, onAgregar }) {
     navigate(`/producto/${id}`)
   }
 
-  function handleAgregar(e) {
+  async function handleAgregar(e) {
     e.preventDefault()
     e.stopPropagation()
 
-    agregarAlCarrito(producto)
+    if (!user) {
+      navigate('/login')
+      return
+    }
+
+    if (!varianteDisponible?.id || totalStock <= 0) return
+
+    await agregarAlCarrito(varianteDisponible.id)
 
     if (onAgregar) {
       onAgregar(nombre)
@@ -116,6 +127,7 @@ export default function ProductCard({ producto, onAgregar }) {
               type="button"
               className="btn-carrito"
               onClick={handleAgregar}
+              disabled={!varianteDisponible?.id || totalStock <= 0}
             >
               <ShoppingCart size={15} />
             </button>

@@ -4,17 +4,16 @@ import {
   RefreshCw, LogOut, ChevronRight,
   Users, ShoppingBag, BarChart2, Tag, AlertCircle
 } from 'lucide-react'
+import { useAuth } from '../context/useAuth'
 import '../styles/CuentaScreen.css'
 
 export default function CuentaScreen() {
   const navigate = useNavigate()
-  const usuarioGuardado = localStorage.getItem('usuario')
-  const usuario = usuarioGuardado ? JSON.parse(usuarioGuardado) : null
+  const { user: usuario, logout } = useAuth()
 
-  function handleCerrarSesion() {
-    localStorage.removeItem('usuario')
+  async function handleCerrarSesion() {
+    await logout()
     navigate('/')
-    window.location.reload()
   }
 
   if (!usuario) {
@@ -38,14 +37,14 @@ export default function CuentaScreen() {
   return (
     <div>
       <div className="cuenta-hero">
-        <div className="cuenta-avatar">{usuario.emoji || '🌿'}</div>
-        <h1 className="cuenta-nombre">{usuario.nombre}</h1>
-        <span className="cuenta-rol-badge">{rolLabel[usuario.rol] || usuario.rol}</span>
+        <div className="cuenta-avatar">🌿</div>
+        <h1 className="cuenta-nombre">{usuario.full_name}</h1>
+        <span className="cuenta-rol-badge">{rolLabel[usuario.role] || usuario.role}</span>
       </div>
 
       <div className="cuenta-body">
 
-        {(usuario.rol === 'cliente' || usuario.rol === 'vendedor') && (
+        {(usuario.role === 'cliente' || usuario.role === 'vendedor') && (
           <>
             <div className="cuenta-opciones">
               <button className="cuenta-opcion">
@@ -92,7 +91,7 @@ export default function CuentaScreen() {
                 <ChevronRight size={16} className="cuenta-opcion-arrow" />
               </button>
 
-              {usuario.rol === 'vendedor' && (
+              {usuario.role === 'vendedor' && (
                 <button className="cuenta-opcion">
                   <div className="cuenta-opcion-icono" style={{ background: '#dcfce7' }}>
                     <Tag size={20} color="#16a34a" />
@@ -106,7 +105,7 @@ export default function CuentaScreen() {
               )}
             </div>
 
-            {usuario.rol === 'cliente' && (
+            {usuario.role === 'cliente' && (
               <Link to="/vender" className="cuenta-banner-vender">
                 <RefreshCw size={24} color="#52b788" />
                 <div className="cuenta-banner-vender-texto">
@@ -119,7 +118,7 @@ export default function CuentaScreen() {
           </>
         )}
 
-        {usuario.rol === 'admin' && (
+        {usuario.role === 'admin' && (
           <>
             <p className="cuenta-seccion-titulo">Panel de control</p>
             <div className="cuenta-opciones">

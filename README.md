@@ -375,6 +375,388 @@ Admin:
 - `GET /admin/reports`
 - `PATCH /admin/reports/:id`
 
+## Plan para construir el backend
+
+La arquitectura recomendada para este proyecto es una API REST monolitica con Express + PostgreSQL. No conviene separar en microservicios todavia porque el producto esta en etapa inicial y necesitan entregar una plataforma funcional, mantenible y facil de desplegar.
+
+Arquitectura objetivo:
+
+```text
+frontend-web React
+  -> backend Express API
+  -> PostgreSQL bd_EcoBazar
+
+backend Express API
+  -> Stripe
+  -> Google OAuth
+  -> Storage de imagenes
+```
+
+### Estructura sugerida
+
+Crear un folder `backend/` en la raiz:
+
+```text
+backend/
+  src/
+    app.js
+    server.js
+    config/
+      env.js
+      db.js
+      stripe.js
+      storage.js
+    middleware/
+      auth.js
+      requireRole.js
+      errorHandler.js
+      upload.js
+    routes/
+      auth.routes.js
+      products.routes.js
+      cart.routes.js
+      orders.routes.js
+      seller.routes.js
+      admin.routes.js
+      reviews.routes.js
+      stripe.routes.js
+    controllers/
+    services/
+    repositories/
+    utils/
+  package.json
+  .env.example
+```
+
+Responsabilidades:
+
+- `routes`: define URLs y middlewares.
+- `controllers`: recibe request/response y valida entrada basica.
+- `services`: contiene reglas de negocio.
+- `repositories`: consultas SQL a PostgreSQL.
+- `middleware`: autenticacion, roles, errores y subida de archivos.
+- `config`: variables de entorno y clientes externos.
+
+### Dependencias recomendadas
+
+Dentro de `backend/`:
+
+```bash
+npm init -y
+npm install express pg dotenv cors helmet morgan bcrypt jsonwebtoken cookie-parser multer stripe google-auth-library zod
+npm install -D nodemon
+```
+
+Scripts sugeridos en `backend/package.json`:
+
+```json
+{
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js"
+  }
+}
+```
+
+### Variables de entorno del backend
+
+Crear `backend/.env.example`:
+
+```env
+NODE_ENV=development
+PORT=3000
+
+DATABASE_URL=postgres://usuario:password@localhost:5432/bd_EcoBazar
+
+FRONTEND_URL=http://localhost:5173
+
+JWT_SECRET=change_me
+JWT_EXPIRES_IN=7d
+
+GOOGLE_CLIENT_ID=your_google_client_id
+
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+
+STORAGE_PROVIDER=local
+STORAGE_BUCKET=uploads
+STORAGE_BASE_PATH=./uploads
+```
+
+Nunca subir `.env` real al repositorio.
+
+### Orden correcto de implementacion
+
+#### 1. Base del servidor
+
+Crear Express con:
+
+- `GET /api/health`
+- CORS restringido a `FRONTEND_URL`
+- `helmet`
+- `express.json()`
+- `cookie-parser`
+- `errorHandler`
+
+Resultado esperado:
+
+```bash
+cd backend
+npm run dev
+```
+
+Debe responder:
+
+```text
+GET http://localhost:3000/api/health
+```
+
+#### 2. Conexion a PostgreSQL
+
+Crear `config/db.js` usando `pg.Pool`.
+
+Reglas:
+
+- Usar `DATABASE_URL`.
+- No abrir conexiones manuales sin cerrarlas.
+- Para operaciones multi-tabla, usar transacciones.
+
+Probar con un endpoint temporal o desde `health` que haga:
+
+```sql
+SELECT now();
+```
+
+#### 3. Autenticacion por email
+
+Endpoints:
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+
+Reglas:
+
+- Hashear contrasenas con `bcrypt`.
+- Guardar `password_hash`, nunca password plano.
+- Crear JWT firmado con `JWT_SECRET`.
+- Guardar sesion en cookie `httpOnly` o enviar token Bearer. Para produccion se recomienda cookie `httpOnly`, `secure`, `sameSite=lax`.
+- `GET /api/auth/me` debe devolver datos seguros del usuario, no `password_hash`.
+
+#### 4. Login con Google
+
+Endpoint:
+
+- `POST /api/auth/google`
+
+Flujo:
+
+1. Frontend obtiene `id_token` de Google.
+2. Backend valida el token con `google-auth-library` y `GOOGLE_CLIENT_ID`.
+3. Backend busca usuario por email o `google_sub`.
+4. Si no existe, crea usuario con `auth_provider = 'google'`.
+5. Backend genera sesion igual que login normal.
+
+#### 5. Catalogo de productos
+
+Endpoints publicos:
+
+- `GET /api/products`
+- `GET /api/products/:id`
+
+Debe devolver:
+
+- producto.
+- vendedor.
+- bazar si aplica.
+- categoria.
+- variantes con talla y stock.
+- imagenes con URL servible por frontend.
+
+La consulta debe filtrar `products.status = 'active'`.
+
+#### 6. Flujo de vendedor
+
+Endpoints:
+
+- `POST /api/seller/applications`
+- `GET /api/seller/me`
+- `POST /api/seller/products`
+- `PATCH /api/seller/products/:id`
+- `POST /api/seller/products/:id/variants`
+- `POST /api/seller/products/:id/images`
+
+Reglas:
+
+- Solo vendedores aprobados pueden publicar.
+- El producto se crea en `products`.
+- Tallas y stock se crean en `product_variants`.
+- Imagenes se suben con `multipart/form-data`.
+- El backend guarda metadata en `files` y relaciona en `product_images`.
+
+Para local se puede guardar en `backend/uploads`. Para produccion conviene S3, Cloudflare R2 o storage del proveedor.
+
+#### 7. Carrito
+
+Endpoints:
+
+- `GET /api/cart`
+- `POST /api/cart/items`
+- `PATCH /api/cart/items/:id`
+- `DELETE /api/cart/items/:id`
+
+Reglas:
+
+- El frontend manda `variant_id`.
+- El backend consulta el producto y valida stock.
+- `cart_items.unit_price_cents` debe guardar el precio actual.
+- No duplicar una misma variante en el carrito; si ya existe, aumentar cantidad.
+
+#### 8. Checkout y Stripe
+
+Endpoints:
+
+- `POST /api/checkout`
+- `POST /api/stripe/webhook`
+
+Flujo:
+
+1. Backend lee carrito del usuario.
+2. Valida stock de cada variante.
+3. Crea `orders`.
+4. Crea `order_items` con snapshot de producto, talla y precio.
+5. Crea sesion de Stripe Checkout.
+6. Guarda `payments` con `stripe_checkout_session_id`.
+7. Devuelve `checkout_url` al frontend.
+8. Stripe llama al webhook.
+9. Backend valida firma con `STRIPE_WEBHOOK_SECRET`.
+10. Si pago fue exitoso, actualiza `payments.status`, `orders.status` y descuenta stock.
+
+El descuento de stock debe hacerse en transaccion para evitar vender mas unidades de las disponibles.
+
+#### 9. Ordenes pickup-only
+
+Endpoints:
+
+- `GET /api/orders`
+- `GET /api/orders/:id`
+- `PATCH /api/seller/orders/:id/pickup`
+
+Reglas:
+
+- No pedir direccion de envio.
+- El vendedor define `pickup_scheduled_at`.
+- La direccion de recoleccion se muestra desde `bazaars` o `seller_profiles`.
+
+#### 10. Reviews
+
+Endpoints:
+
+- `POST /api/reviews`
+- `GET /api/sellers/:id/reviews`
+
+Reglas:
+
+- Solo compradores autenticados.
+- Validar que el pedido pertenece al comprador.
+- Validar que el pedido tiene un item del vendedor.
+- La tabla `reviews` actualiza automaticamente `seller_profiles.rating_average` con trigger.
+
+#### 11. Admin
+
+Endpoints:
+
+- `GET /api/admin/seller-applications`
+- `PATCH /api/admin/seller-applications/:id`
+- `GET /api/admin/products`
+- `PATCH /api/admin/products/:id/status`
+- `GET /api/admin/reports`
+- `PATCH /api/admin/reports/:id`
+
+Reglas:
+
+- Proteger con `requireRole('admin')`.
+- Registrar acciones importantes en `admin_actions`.
+
+### Integracion del frontend por etapas
+
+No intentes conectar todo al mismo tiempo. Orden recomendado:
+
+1. Crear `frontend-web/src/services/api.js`.
+2. Conectar login y registro.
+3. Reemplazar `localStorage.usuario` por `GET /auth/me`.
+4. Reemplazar `src/data/productos.js` por `GET /products`.
+5. Hacer que `ProductoScreen` use variantes reales.
+6. Reemplazar carrito en `localStorage` por endpoints.
+7. Conectar checkout.
+8. Conectar vendedor/admin.
+
+Mientras migran, pueden dejar pantallas no terminadas con mensajes controlados, pero no deben mezclar datos falsos con datos reales en el mismo flujo de compra.
+
+### Seguridad minima para produccion
+
+- Usar HTTPS.
+- Usar cookies `httpOnly`, `secure` y `sameSite=lax` para sesion.
+- No exponer `DATABASE_URL`, Stripe secret ni Google secret al frontend.
+- Validar inputs con `zod`.
+- Validar roles en backend.
+- Aplicar rate limit a login y registro.
+- Limitar tamano y tipo MIME de imagenes.
+- Validar webhooks de Stripe con firma.
+- Usar transacciones para checkout, pagos y stock.
+- Configurar CORS solo para el dominio real.
+- Mantener logs sin imprimir passwords, tokens ni secretos.
+
+### Despliegue recomendado
+
+Opcion simple:
+
+- Frontend: Vercel, Netlify o el hosting que prefieran.
+- Backend: Render, Railway, Fly.io o VPS.
+- Base de datos: PostgreSQL administrado del proveedor.
+- Imagenes: Cloudflare R2, S3 o storage compatible.
+
+Variables en produccion:
+
+```env
+NODE_ENV=production
+PORT=3000
+DATABASE_URL=postgres://...
+FRONTEND_URL=https://tudominio.com
+JWT_SECRET=...
+GOOGLE_CLIENT_ID=...
+STRIPE_SECRET_KEY=...
+STRIPE_WEBHOOK_SECRET=...
+STORAGE_PROVIDER=...
+```
+
+Antes de salir a produccion:
+
+```bash
+psql "$DATABASE_URL" -f bd_EcoBazar.sql
+cd backend
+npm install
+npm start
+cd ../frontend-web
+npm install
+npm run build
+```
+
+Checklist de salida:
+
+- Login email funciona.
+- Login Google funciona.
+- Productos vienen de la API.
+- Imagenes se suben y se muestran.
+- Carrito usa `variant_id`.
+- Stripe checkout crea orden.
+- Webhook confirma pago.
+- Stock baja despues del pago exitoso.
+- Vendedor puede agendar pickup.
+- Cliente puede dejar review.
+- Admin puede aprobar vendedores y revisar reportes.
+
 ## Resumen de flujo principal
 
 1. Usuario se registra con email o Google.

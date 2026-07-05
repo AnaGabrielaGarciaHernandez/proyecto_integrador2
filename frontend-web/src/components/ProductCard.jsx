@@ -1,26 +1,35 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { Heart, ShoppingCart, User } from 'lucide-react'
+import { ShoppingCart } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { agregarAlCarrito } from '../services/carrito'
 import { useAuth } from '../context/useAuth'
 import '../styles/ProductCard.css'
 
 export default function ProductCard({ producto, onAgregar }) {
   const navigate = useNavigate()
   const { user } = useAuth()
+
   const {
     id,
-    imagen,
-    tipo,
-    descuento,
-    condicion,
-    categoria,
     nombre,
-    vendedor,
-    talla,
+    categoria,
     precio,
     precioOriginal,
+    imagen,
+    vendedor,
+    talla,
+    condicion,
+    tipo,
     varianteDisponible,
     totalStock,
   } = producto
+
+  const descuento = Math.round(
+    ((precioOriginal - precio) / precioOriginal) * 100
+  )
+
+  function irAlProducto() {
+    navigate(`/producto/${id}`)
+  }
 
   async function handleAgregar(e) {
     e.preventDefault()
@@ -33,73 +42,98 @@ export default function ProductCard({ producto, onAgregar }) {
 
     if (!varianteDisponible?.id || totalStock <= 0) return
 
-    if (onAgregar) {
-      await onAgregar(producto)
+    try {
+      await agregarAlCarrito(varianteDisponible.id)
+
+      // Solo avisa al Home para mostrar el toast
+      onAgregar?.(nombre)
+    } catch (error) {
+      console.error(error)
     }
   }
 
   return (
-    <Link to={`/producto/${id}`} className="product-card">
-
-      {/* Imagen */}
+    <div
+      className="product-card"
+      onClick={irAlProducto}
+    >
       <div className="card-imagen">
         <img src={imagen} alt={nombre} />
 
-        {/* Badges superiores */}
         <div className="card-badges-top">
           {tipo && (
             <span className={`badge-tipo badge-tipo--${tipo.toLowerCase()}`}>
               {tipo}
             </span>
           )}
-          {descuento && (
-            <span className="badge-descuento">-{descuento}%</span>
-          )}
+
+          <span className="badge-descuento">
+            -{descuento}%
+          </span>
         </div>
 
-        {/* Favorito */}
-        <button className="card-favorito" onClick={(e) => e.preventDefault()}>
-          <Heart size={15} />
-        </button>
-
-        {/* Condición */}
         <div className="card-condicion">
-          <span className={`badge-condicion badge-condicion--${condicion.toLowerCase().replaceAll(' ', '-')}`}>
-            ● {condicion}
+          <span
+            className={`badge-condicion badge-condicion--${condicion
+              .toLowerCase()
+              .replace(' ', '-')}`}
+          >
+            {condicion}
           </span>
         </div>
       </div>
 
-      {/* Info */}
       <div className="card-info">
-        <p className="card-categoria">{categoria}</p>
-        <p className="card-nombre">{nombre}</p>
+
+        <span className="card-categoria">
+          {categoria}
+        </span>
+
+        <h3 className="card-nombre">
+          {nombre}
+        </h3>
 
         <div className="card-footer">
+
           <div className="card-vendedor">
-            <User size={13} className="vendedor-avatar" />
-            <span className="vendedor-nombre">{vendedor}</span>
-            <span className="vendedor-talla">{talla}</span>
+            <span className="vendedor-avatar">👤</span>
+
+            <span className="vendedor-nombre">
+              {vendedor}
+            </span>
+
+            <span className="vendedor-talla">
+              {talla}
+            </span>
           </div>
 
           <div className="card-precio-carrito">
+
             <div className="card-precios">
-              <span className="precio-actual">${precio}</span>
-              {precioOriginal && (
-                <span className="precio-original">${precioOriginal}</span>
-              )}
+              <span className="precio-actual">
+                ${precio}
+              </span>
+
+              <span className="precio-original">
+                ${precioOriginal}
+              </span>
             </div>
+
             <button
+              type="button"
               className="btn-carrito"
               onClick={handleAgregar}
               disabled={!varianteDisponible?.id || totalStock <= 0}
             >
               <ShoppingCart size={15} />
             </button>
+
           </div>
+
         </div>
+
       </div>
 
-    </Link>
+    </div>
   )
 }

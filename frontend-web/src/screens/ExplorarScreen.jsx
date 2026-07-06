@@ -87,104 +87,78 @@ export default function ExplorarScreen() {
   }, [productos, busqueda, categoriaSeleccionada])
 
   return (
-    <div className="explorar-container">
+  <div className="explorar-container">
 
-      {toast && (
-        <div className="toast-carrito">
-          <ShoppingCart size={16} />
-          Agregado: {toast}
-        </div>
-      )}
+    {toast && (
+      <div className="toast-carrito">
+        <ShoppingCart size={16} /> Agregado: {toast}
+      </div>
+    )}
 
-      <div className="explorar-header">
+    {/* Header oscuro */}
+    <div className="explorar-header">
+      <h1>Explorar</h1>
+      <p className="explorar-header-sub">
+        {productosFiltrados.length} prendas disponibles
+      </p>
+      <div className="explorar-search">
+        <Search size={18} />
+        <input
+          type="text"
+          placeholder="Buscar prendas..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+      </div>
+    </div>
 
-        <div>
+    {/* Categorías */}
+    <div className="explorar-categorias">
+      {categorias.map((categoria) => (
+        <button
+          key={categoria.nombre}
+          className={categoriaSeleccionada === categoria.nombre ? 'categoria active' : 'categoria'}
+          onClick={() => setCategoriaSeleccionada(categoria.nombre)}
+        >
+          {categoria.icono}
+          <span>{categoria.nombre}</span>
+        </button>
+      ))}
+    </div>
 
-          <h1>Explorar</h1>
+    {/* Body */}
+    <div className="explorar-body">
 
-          <span>
-            {productosFiltrados.length} prendas disponibles
+      {/* Subtítulo categoría */}
+      {!cargando && !error && (
+        <div className="explorar-categoria-titulo">
+          {categoriaSeleccionada === 'Todo' ? 'Todas las prendas' : categoriaSeleccionada}
+          <span className="explorar-categoria-count">
+            · {productosFiltrados.length} prendas
           </span>
-
-        </div>
-
-        <div className="explorar-search">
-
-          <Search size={18} />
-
-          <input
-            type="text"
-            placeholder="Buscar prendas..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-          />
-
-        </div>
-
-      </div>
-
-      <div className="explorar-categorias">
-
-        {categorias.map((categoria) => (
-
-          <button
-            key={categoria.nombre}
-            className={
-              categoriaSeleccionada === categoria.nombre
-                ? 'categoria active'
-                : 'categoria'
-            }
-            onClick={() =>
-              setCategoriaSeleccionada(categoria.nombre)
-            }
-          >
-
-            {categoria.icono}
-
-            <span>{categoria.nombre}</span>
-
-          </button>
-
-        ))}
-
-      </div>
-
-      {cargando && (
-        <div className="explorar-loading">
-          Cargando productos...
         </div>
       )}
 
-      {error && (
-        <div className="login-error">
-          {error}
-        </div>
-      )}
+      {cargando && <div className="explorar-loading">Cargando productos...</div>}
+      {error && <div className="login-error">{error}</div>}
 
-      {!cargando &&
-        !error &&
-        productosFiltrados.length === 0 && (
-          <div className="explorar-vacio">
-            No se encontraron productos.
-          </div>
-        )}
+      {!cargando && !error && productosFiltrados.length === 0 && (
+        <div className="explorar-vacio">No se encontraron productos.</div>
+      )}
 
       {!cargando && !error && (
         <div className="explorar-grid">
-
           {productosFiltrados.map((producto) => (
-
             <ProductCard
               key={producto.id}
               producto={producto}
               onAgregar={handleAgregar}
             />
-
           ))}
-
         </div>
       )}
 
     </div>
-  )
+  </div>
+)
 }

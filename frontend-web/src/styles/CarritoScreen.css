@@ -1,6 +1,8 @@
 .carrito-hero {
   background: var(--color-sidebar-bg);
-  padding: 32px 40px;
+  padding: 48px 40px 40px;
+  display: flex;
+  flex-direction: column;
 }
 
 .carrito-hero h1 {
@@ -8,6 +10,7 @@
   font-weight: 800;
   color: #ffffff;
   margin-bottom: 4px;
+  margin-top: 20px;
 }
 
 .carrito-hero-sub {

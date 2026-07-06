@@ -47,7 +47,7 @@ export default function CuentaScreen() {
         {(usuario.role === 'cliente' || usuario.role === 'vendedor') && (
           <>
             <div className="cuenta-opciones">
-              <button className="cuenta-opcion">
+              <button className="cuenta-opcion" onClick={() => navigate('/pedidos')}>
                 <div className="cuenta-opcion-icono" style={{ background: '#fff3e0' }}>
                   <Package size={20} color="#f59e0b" />
                 </div>

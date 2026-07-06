@@ -1,12 +1,12 @@
-import { ShoppingCart } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import { agregarAlCarrito } from '../services/carrito'
-import { useAuth } from '../context/useAuth'
-import '../styles/ProductCard.css'
+import { ShoppingCart } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { agregarAlCarrito } from "../services/carrito";
+import { useAuth } from "../context/useAuth";
+import "../styles/ProductCard.css";
 
 export default function ProductCard({ producto, onAgregar }) {
-  const navigate = useNavigate()
-  const { user } = useAuth()
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
   const {
     id,
@@ -21,42 +21,39 @@ export default function ProductCard({ producto, onAgregar }) {
     tipo,
     varianteDisponible,
     totalStock,
-  } = producto
+  } = producto;
 
   const descuento = Math.round(
-    ((precioOriginal - precio) / precioOriginal) * 100
-  )
+    ((precioOriginal - precio) / precioOriginal) * 100,
+  );
 
   function irAlProducto() {
-    navigate(`/producto/${id}`)
+    navigate(`/producto/${id}`);
   }
 
   async function handleAgregar(e) {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault();
+    e.stopPropagation();
 
     if (!user) {
-      navigate('/login')
-      return
+      navigate("/login");
+      return;
     }
 
-    if (!varianteDisponible?.id || totalStock <= 0) return
+    if (!varianteDisponible?.id || totalStock <= 0) return;
 
     try {
-      await agregarAlCarrito(varianteDisponible.id)
+      await agregarAlCarrito(varianteDisponible.id);
 
       // Solo avisa al Home para mostrar el toast
-      onAgregar?.(nombre)
+      onAgregar?.(nombre);
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
   }
 
   return (
-    <div
-      className="product-card"
-      onClick={irAlProducto}
-    >
+    <div className="product-card" onClick={irAlProducto}>
       <div className="card-imagen">
         <img src={imagen} alt={nombre} />
 
@@ -67,16 +64,14 @@ export default function ProductCard({ producto, onAgregar }) {
             </span>
           )}
 
-          <span className="badge-descuento">
-            -{descuento}%
-          </span>
+          <span className="badge-descuento">-{descuento}%</span>
         </div>
 
         <div className="card-condicion">
           <span
             className={`badge-condicion badge-condicion--${condicion
               .toLowerCase()
-              .replace(' ', '-')}`}
+              .replace(" ", "-")}`}
           >
             {condicion}
           </span>
@@ -84,39 +79,24 @@ export default function ProductCard({ producto, onAgregar }) {
       </div>
 
       <div className="card-info">
+        <span className="card-categoria">{categoria}</span>
 
-        <span className="card-categoria">
-          {categoria}
-        </span>
-
-        <h3 className="card-nombre">
-          {nombre}
-        </h3>
+        <h3 className="card-nombre">{nombre}</h3>
 
         <div className="card-footer">
-
           <div className="card-vendedor">
             <span className="vendedor-avatar">👤</span>
 
-            <span className="vendedor-nombre">
-              {vendedor}
-            </span>
+            <span className="vendedor-nombre">{vendedor}</span>
 
-            <span className="vendedor-talla">
-              {talla}
-            </span>
+            <span className="vendedor-talla">{talla}</span>
           </div>
 
           <div className="card-precio-carrito">
-
             <div className="card-precios">
-              <span className="precio-actual">
-                ${precio}
-              </span>
+              <span className="precio-actual">${precio}</span>
 
-              <span className="precio-original">
-                ${precioOriginal}
-              </span>
+              <span className="precio-original">${precioOriginal}</span>
             </div>
 
             <button
@@ -127,13 +107,9 @@ export default function ProductCard({ producto, onAgregar }) {
             >
               <ShoppingCart size={15} />
             </button>
-
           </div>
-
         </div>
-
       </div>
-
     </div>
-  )
+  );
 }

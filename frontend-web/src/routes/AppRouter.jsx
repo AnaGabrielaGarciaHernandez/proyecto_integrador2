@@ -10,6 +10,8 @@ import LoginScreen    from '../screens/LoginScreen'
 import RegistroScreen from '../screens/RegistroScreen'
 import VenderScreen   from '../screens/VenderScreen'
 import AdminScreen from '../screens/AdminScreen'
+import RecientesScreen from '../screens/RecientesScreen'
+import OrdersScreen from '../screens/OrdersScreen'
 
 export default function AppRouter() {
   return (
@@ -17,6 +19,8 @@ export default function AppRouter() {
       <Route element={<MainLayout />}>
         <Route path="/"             element={<HomeScreen />} />
         <Route path="/explorar"     element={<ExplorarScreen />} />
+        <Route path="/recientes"    element={<RecientesScreen />} />
+        <Route path="/pedidos"      element={<OrdersScreen />} />
         <Route path="/carrito"      element={<CarritoScreen />} />
         <Route path="/cuenta"       element={<CuentaScreen />} />
         <Route path="/producto/:id" element={<ProductoScreen />} />

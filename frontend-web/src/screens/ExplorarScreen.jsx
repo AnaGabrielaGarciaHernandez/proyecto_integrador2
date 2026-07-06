@@ -1,164 +1,157 @@
-import { useEffect, useMemo, useState } from 'react'
-import {
-  Search,
-  ShoppingCart,
-  Grid2x2,
-  Shirt,
-  Badge,
-  Footprints,
-  Gem,
-  Sparkles,
-} from 'lucide-react'
-import ProductCard from '../components/ProductCard'
-import { agregarAlCarrito } from '../services/carrito'
-import { getProducts } from '../services/products'
-import '../styles/ExplorarScreen.css'
+import { useEffect, useMemo, useState } from "react";
+import { Search, ShoppingCart } from "lucide-react";
+import ProductCard from "../components/ProductCard";
+import { agregarAlCarrito } from "../services/carrito";
+import { getProducts } from "../services/products";
+import "../styles/ExplorarScreen.css";
 
 const categorias = [
-  { nombre: 'Todo', icono: <Grid2x2 size={18} /> },
-  { nombre: 'Sudaderas', icono: <Shirt size={18} /> },
-  { nombre: 'Chaquetas', icono: <Badge size={18} /> },
-  { nombre: 'Pantalones', icono: <Badge size={18} /> },
-  { nombre: 'Camisas', icono: <Shirt size={18} /> },
-  { nombre: 'Camisetas', icono: <Shirt size={18} /> },
-  { nombre: 'Vestidos', icono: <Sparkles size={18} /> },
-  { nombre: 'Calzado', icono: <Footprints size={18} /> },
-  { nombre: 'Accesorios', icono: <Gem size={18} /> },
-]
+  { nombre: "Todo" },
+  { nombre: "Sudaderas" },
+  { nombre: "Chaquetas" },
+  { nombre: "Pantalones" },
+  { nombre: "Camisetas" },
+  { nombre: "Vestidos" },
+  { nombre: "Calzado" },
+  { nombre: "Accesorios" },
+];
 
 export default function ExplorarScreen() {
-  const [productos, setProductos] = useState([])
-  const [cargando, setCargando] = useState(true)
-  const [error, setError] = useState('')
-  const [toast, setToast] = useState(null)
+  const [productos, setProductos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
 
-  const [busqueda, setBusqueda] = useState('')
-  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('Todo')
+  const [busqueda, setBusqueda] = useState("");
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("Todo");
 
   useEffect(() => {
-    let mounted = true
+    let mounted = true;
 
     getProducts({ limit: 48 })
       .then(({ products }) => {
-        if (mounted) setProductos(products)
+        if (mounted) setProductos(products);
       })
       .catch((err) => {
         if (mounted)
-          setError(err.message || 'No se pudieron cargar los productos.')
+          setError(err.message || "No se pudieron cargar los productos.");
       })
       .finally(() => {
-        if (mounted) setCargando(false)
-      })
+        if (mounted) setCargando(false);
+      });
 
     return () => {
-      mounted = false
-    }
-  }, [])
+      mounted = false;
+    };
+  }, []);
 
   async function handleAgregar(producto) {
     try {
-      setError('')
-      await agregarAlCarrito(producto.varianteDisponible.id)
+      setError("");
+      await agregarAlCarrito(producto.varianteDisponible.id);
 
-      setToast(producto.nombre)
+      setToast(producto.nombre);
 
       setTimeout(() => {
-        setToast(null)
-      }, 2500)
+        setToast(null);
+      }, 2500);
     } catch (err) {
-      setError(err.message || 'No se pudo agregar al carrito.')
+      setError(err.message || "No se pudo agregar al carrito.");
     }
   }
 
   const productosFiltrados = useMemo(() => {
     return productos.filter((producto) => {
       const coincideNombre =
-        producto.nombre
-          ?.toLowerCase()
-          .includes(busqueda.toLowerCase()) ?? false
+        producto.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ??
+        false;
 
       const coincideCategoria =
-        categoriaSeleccionada === 'Todo' ||
+        categoriaSeleccionada === "Todo" ||
         producto.categoria?.toLowerCase() ===
-          categoriaSeleccionada.toLowerCase()
+          categoriaSeleccionada.toLowerCase();
 
-      return coincideNombre && coincideCategoria
-    })
-  }, [productos, busqueda, categoriaSeleccionada])
+      return coincideNombre && coincideCategoria;
+    });
+  }, [productos, busqueda, categoriaSeleccionada]);
 
   return (
-  <div className="explorar-container">
-
-    {toast && (
-      <div className="toast-carrito">
-        <ShoppingCart size={16} /> Agregado: {toast}
-      </div>
-    )}
-
-    {/* Header oscuro */}
-    <div className="explorar-header">
-      <h1>Explorar</h1>
-      <p className="explorar-header-sub">
-        {productosFiltrados.length} prendas disponibles
-      </p>
-      <div className="explorar-search">
-        <Search size={18} />
-        <input
-          type="text"
-          placeholder="Buscar prendas..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
-      </div>
-    </div>
-
-    {/* Categorías */}
-    <div className="explorar-categorias">
-      {categorias.map((categoria) => (
-        <button
-          key={categoria.nombre}
-          className={categoriaSeleccionada === categoria.nombre ? 'categoria active' : 'categoria'}
-          onClick={() => setCategoriaSeleccionada(categoria.nombre)}
-        >
-          {categoria.icono}
-          <span>{categoria.nombre}</span>
-        </button>
-      ))}
-    </div>
-
-    {/* Body */}
-    <div className="explorar-body">
-
-      {/* Subtítulo categoría */}
-      {!cargando && !error && (
-        <div className="explorar-categoria-titulo">
-          {categoriaSeleccionada === 'Todo' ? 'Todas las prendas' : categoriaSeleccionada}
-          <span className="explorar-categoria-count">
-            · {productosFiltrados.length} prendas
-          </span>
+    <div className="explorar-container">
+      {toast && (
+        <div className="toast-carrito">
+          <ShoppingCart size={16} /> Agregado: {toast}
         </div>
       )}
 
-      {cargando && <div className="explorar-loading">Cargando productos...</div>}
-      {error && <div className="login-error">{error}</div>}
-
-      {!cargando && !error && productosFiltrados.length === 0 && (
-        <div className="explorar-vacio">No se encontraron productos.</div>
-      )}
-
-      {!cargando && !error && (
-        <div className="explorar-grid">
-          {productosFiltrados.map((producto) => (
-            <ProductCard
-              key={producto.id}
-              producto={producto}
-              onAgregar={handleAgregar}
-            />
-          ))}
+      {/* Header oscuro */}
+      <div className="explorar-header">
+        <h1>Explorar</h1>
+        <p className="explorar-header-sub">
+          {productosFiltrados.length} prendas disponibles
+        </p>
+        <div className="explorar-search">
+          <Search size={18} />
+          <input
+            type="text"
+            placeholder="Buscar prendas..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
         </div>
-      )}
+      </div>
 
+      {/* Categorías */}
+      <div className="explorar-categorias">
+        {categorias.map((categoria) => (
+          <button
+            key={categoria.nombre}
+            className={
+              categoriaSeleccionada === categoria.nombre
+                ? "categoria active"
+                : "categoria"
+            }
+            onClick={() => setCategoriaSeleccionada(categoria.nombre)}
+          >
+            <span>{categoria.nombre}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Body */}
+      <div className="explorar-body">
+        {/* Subtítulo categoría */}
+        {!cargando && !error && (
+          <div className="explorar-categoria-titulo">
+            {categoriaSeleccionada === "Todo"
+              ? "Todas las prendas"
+              : categoriaSeleccionada}
+            <span className="explorar-categoria-count">
+              · {productosFiltrados.length} prendas
+            </span>
+          </div>
+        )}
+
+        {cargando && (
+          <div className="explorar-loading">Cargando productos...</div>
+        )}
+        {error && <div className="login-error">{error}</div>}
+
+        {!cargando && !error && productosFiltrados.length === 0 && (
+          <div className="explorar-vacio">No se encontraron productos.</div>
+        )}
+
+        {!cargando && !error && (
+          <div className="explorar-grid">
+            {productosFiltrados.map((producto) => (
+              <ProductCard
+                key={producto.id}
+                producto={producto}
+                onAgregar={handleAgregar}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-)
+  );
 }

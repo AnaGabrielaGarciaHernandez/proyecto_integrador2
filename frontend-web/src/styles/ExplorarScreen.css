@@ -31,8 +31,8 @@
   gap: 12px;
   padding: 14px 20px;
   border-radius: 14px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   transition: border-color 0.2s;
 }
 
@@ -41,7 +41,7 @@
 }
 
 .explorar-search svg {
-  color: rgba(255,255,255,0.4);
+  color: rgba(255, 255, 255, 0.4);
   flex-shrink: 0;
 }
 
@@ -56,7 +56,7 @@
 }
 
 .explorar-search input::placeholder {
-  color: rgba(255,255,255,0.35);
+  color: rgba(255, 255, 255, 0.35);
 }
 
 /* ── Categorías ── */
@@ -92,6 +92,13 @@
 
 .categoria svg {
   color: var(--color-text-muted);
+  width: 20px;
+  height: 20px;
+  display: block;
+  flex-shrink: 0;
+  /* ensure SVG strokes follow text color */
+  stroke: currentColor;
+  fill: none;
 }
 
 .categoria:hover {
@@ -129,7 +136,7 @@
 }
 
 .explorar-categoria-titulo::before {
-  content: '';
+  content: "";
   width: 8px;
   height: 8px;
   border-radius: 50%;

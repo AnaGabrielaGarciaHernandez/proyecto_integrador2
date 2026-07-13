@@ -1,5 +1,9 @@
 const GOOGLE_SCRIPT_ID = 'google-identity-services'
 
+let initializedClientId = null
+let activeOnCredential = null
+let activeOnError = null
+
 export function hasGoogleClientId() {
   return Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID)
 }
@@ -19,17 +23,7 @@ export async function renderGoogleButton(container, { text = 'signin_with', onCr
       throw new Error('Google Identity Services no está disponible')
     }
 
-    window.google.accounts.id.initialize({
-      client_id: clientId,
-      callback: (response) => {
-        if (response.credential) {
-          onCredential(response.credential)
-          return
-        }
-
-        onError?.(new Error('Google no devolvió credenciales'))
-      },
-    })
+    initializeGoogleIdentity(clientId, { onCredential, onError })
 
     container.innerHTML = ''
     window.google.accounts.id.renderButton(container, {
@@ -59,15 +53,9 @@ export function requestGoogleIdToken() {
       return
     }
 
-    window.google.accounts.id.initialize({
-      client_id: clientId,
-      callback: (response) => {
-        if (response.credential) {
-          resolve(response.credential)
-        } else {
-          reject(new Error('Google no devolvió credenciales'))
-        }
-      },
+    initializeGoogleIdentity(clientId, {
+      onCredential: resolve,
+      onError: reject,
     })
 
     window.google.accounts.id.prompt((notification) => {
@@ -101,4 +89,28 @@ function loadGoogleScript() {
     script.onerror = () => reject(new Error('No se pudo cargar Google Identity Services'))
     document.head.appendChild(script)
   })
+}
+
+function initializeGoogleIdentity(clientId, { onCredential, onError }) {
+  activeOnCredential = onCredential
+  activeOnError = onError
+
+  if (initializedClientId === clientId) {
+    return
+  }
+
+  window.google.accounts.id.initialize({
+    client_id: clientId,
+    callback: handleCredentialResponse,
+  })
+  initializedClientId = clientId
+}
+
+function handleCredentialResponse(response) {
+  if (response.credential) {
+    activeOnCredential?.(response.credential)
+    return
+  }
+
+  activeOnError?.(new Error('Google no devolvió credenciales'))
 }

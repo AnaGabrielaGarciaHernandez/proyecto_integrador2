@@ -136,32 +136,43 @@ export default function CarritoScreen() {
                   </p>
                 </div>
 
-                <div className="carrito-item-controles">
-                  <button
-                    className="carrito-btn-cantidad"
-                    onClick={() => handleCantidad(item, -1)}
-                  >
-                    <Minus size={12} />
-                  </button>
+                <div className="carrito-item-acciones">
+                  <div className="carrito-item-controles">
+                    <button
+                      className="carrito-btn-cantidad"
+                      onClick={() => handleCantidad(item, -1)}
+                      aria-label={`Disminuir cantidad de ${item.nombre}`}
+                    >
+                      <Minus size={12} />
+                    </button>
 
-                  <span className="carrito-cantidad">
-                    {item.cantidad}
-                  </span>
+                    <span className="carrito-cantidad">
+                      {item.cantidad}
+                    </span>
 
-                  <button
-                    className="carrito-btn-cantidad"
-                    onClick={() => handleCantidad(item, 1)}
-                    disabled={item.cantidad >= item.stock}
-                  >
-                    <Plus size={12} />
-                  </button>
+                    <button
+                      className="carrito-btn-cantidad"
+                      onClick={() => handleCantidad(item, 1)}
+                      disabled={item.cantidad >= item.stock}
+                      aria-label={`Aumentar cantidad de ${item.nombre}`}
+                    >
+                      <Plus size={12} />
+                    </button>
 
-                  <button
-                    className="carrito-btn-eliminar"
-                    onClick={() => handleEliminar(item.id)}
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                    <button
+                      className="carrito-btn-eliminar"
+                      onClick={() => handleEliminar(item.id)}
+                      aria-label={`Eliminar ${item.nombre} del carrito`}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+
+                  {item.cantidad >= item.stock && (
+                    <span className="carrito-stock-maximo">
+                      Stock máximo alcanzado
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

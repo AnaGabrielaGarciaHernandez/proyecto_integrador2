@@ -13,7 +13,7 @@ export default function OrdersScreen() {
     if (!loading) {
       getOrdersForUser(user)
         .then((list) => { if (mounted) setOrders(list) })
-        .catch((e) => { if (mounted) setError('Error cargando pedidos') })
+        .catch(() => { if (mounted) setError('Error cargando pedidos') })
     }
     return () => { mounted = false }
   }, [user, loading])

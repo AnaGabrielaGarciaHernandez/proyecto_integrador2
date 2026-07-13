@@ -25,7 +25,7 @@ CREATE TYPE seller_type AS ENUM ('person', 'store', 'bazar');
 CREATE TYPE bazaar_status AS ENUM ('draft', 'published', 'archived', 'cancelled');
 CREATE TYPE product_condition AS ENUM ('nuevo', 'como nuevo', 'buen estado', 'usado', 'muy usado');
 CREATE TYPE product_status AS ENUM ('draft', 'active', 'paused', 'sold', 'removed');
-CREATE TYPE order_status AS ENUM ('pending_payment', 'paid', 'preparing', 'shipped', 'delivered', 'cancelled', 'refunded');
+CREATE TYPE order_status AS ENUM ('pending_payment', 'paid', 'preparing', 'ready_for_pickup', 'delivered', 'cancelled', 'refunded');
 CREATE TYPE payment_status AS ENUM ('pending', 'requires_action', 'succeeded', 'failed', 'cancelled', 'refunded');
 CREATE TYPE report_status AS ENUM ('pending', 'reviewing', 'resolved', 'dismissed');
 CREATE TYPE report_target_type AS ENUM ('product', 'seller', 'bazaar', 'user');
@@ -228,6 +228,7 @@ CREATE TABLE orders (
   total_cents integer NOT NULL CHECK (total_cents >= 0),
   currency char(3) NOT NULL DEFAULT 'MXN',
   pickup_scheduled_at timestamptz,
+  checkout_expires_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   paid_at timestamptz,
@@ -474,6 +475,7 @@ CREATE INDEX bazaars_owner_idx ON bazaars (owner_seller_id);
 CREATE INDEX cart_items_cart_idx ON cart_items (cart_id);
 CREATE INDEX orders_buyer_idx ON orders (buyer_id);
 CREATE INDEX orders_status_idx ON orders (status);
+CREATE UNIQUE INDEX orders_one_pending_payment_per_buyer_idx ON orders (buyer_id) WHERE status = 'pending_payment';
 CREATE INDEX order_items_order_idx ON order_items (order_id);
 CREATE INDEX order_items_seller_idx ON order_items (seller_id);
 CREATE INDEX order_items_variant_idx ON order_items (variant_id);

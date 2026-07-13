@@ -1,0 +1,32 @@
+.checkout-status-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.checkout-status-card {
+  width: min(100%, 520px);
+  padding: 40px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid #ece9e2;
+  text-align: center;
+  box-shadow: 0 18px 45px rgba(22, 50, 38, 0.08);
+}
+
+.checkout-status-icon { margin-bottom: 16px; }
+.checkout-status-icon.success { color: #15803d; }
+.checkout-status-icon.pending { color: #b45309; }
+.checkout-status-icon.cancelled { color: #b91c1c; }
+.checkout-status-card h1 { margin: 0 0 12px; color: var(--color-text); }
+.checkout-status-card p { color: var(--color-text-muted); line-height: 1.6; margin: 0 0 24px; }
+.checkout-status-error { color: #b91c1c; background: #fef2f2; border-radius: 10px; padding: 12px; margin-bottom: 18px; }
+.checkout-status-primary, .checkout-status-secondary { display: block; border-radius: 12px; padding: 13px 18px; font-weight: 700; }
+.checkout-status-primary { color: #fff; background: var(--color-sidebar-bg); }
+.checkout-status-secondary { color: var(--color-text-muted); margin-top: 8px; }
+
+@media (max-width: 768px) {
+  .checkout-status-page { padding: 72px 16px 24px; }
+  .checkout-status-card { padding: 30px 20px; }
+}

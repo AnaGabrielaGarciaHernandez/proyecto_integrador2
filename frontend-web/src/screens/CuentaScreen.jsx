@@ -52,8 +52,8 @@ export default function CuentaScreen() {
                   <Package size={20} color="#f59e0b" />
                 </div>
                 <div className="cuenta-opcion-texto">
-                  <h3>Mis pedidos</h3>
-                  <p>Revisa el estado de tus compras</p>
+                  <h3>{usuario.role === 'vendedor' ? 'Mis ventas' : 'Mis pedidos'}</h3>
+                  <p>{usuario.role === 'vendedor' ? 'Revisa tus pedidos vendidos' : 'Revisa el estado de tus compras'}</p>
                 </div>
                 <ChevronRight size={16} className="cuenta-opcion-arrow" />
               </button>

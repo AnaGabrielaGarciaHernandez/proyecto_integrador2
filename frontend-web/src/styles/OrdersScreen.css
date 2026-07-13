@@ -3,24 +3,29 @@
 .orders-hero h2 { color:#fff; margin:0 0 4px 0; font-size:36px }
 .orders-sub { color: var(--color-accent); margin:0 }
 .orders-body { padding: 24px 40px }
+.orders-message { padding: 32px; color:var(--color-text-muted) }
+.orders-error { color:#b91c1c; background:#fef2f2; padding:12px 14px; border-radius:10px; margin-bottom:12px }
 .orders-empty { color: var(--color-text-muted); padding: 24px }
 .order-row { display:flex; justify-content:space-between; align-items:center; padding:14px; border-radius:10px; background:#fff; border:1px solid #ece9e2; margin-bottom:12px }
 .order-left { display:flex; flex-direction:column }
 .order-id { font-weight:700 }
 .order-date { font-size:13px; color:var(--color-text-muted) }
-.order-items { color:var(--color-text); margin-top:8px }
+.order-items { color:var(--color-text); margin-top:8px; display:flex; flex-direction:column; gap:3px }
+.order-buyer { color:var(--color-text-muted); font-size:13px; margin-top:4px }
 .order-right { display:flex; flex-direction:column; align-items:flex-end }
 .order-status { padding:6px 10px; border-radius:999px; font-weight:700; font-size:13px; margin-bottom:8px }
 .order-total { font-weight:700 }
-.order-status--pendiente { background:#fef3c7; color:#92400e }
-.order-status--enviado { background:#ecfccb; color:#365314 }
-.order-status--entregado { background:#ecfdf5; color:#065f46 }
-.order-status--nuevo { background:#e6f7ff; color:#0369a1 }
-.order-status--aceptado { background:#ecfdf5; color:#065f46 }
-.order-status--empacado { background:#fff7ed; color:#92400e }
-.order-status--completado { background:#ecfdf5; color:#065f46 }
+.order-status--pending_payment { background:#fef3c7; color:#92400e }
+.order-status--paid { background:#e0f2fe; color:#075985 }
+.order-status--preparing { background:#fff7ed; color:#9a3412 }
+.order-status--ready_for_pickup { background:#ecfccb; color:#365314 }
+.order-status--delivered { background:#ecfdf5; color:#065f46 }
+.order-status--cancelled { background:#fee2e2; color:#991b1b }
+.order-status--refunded { background:#f3e8ff; color:#6b21a8 }
 
 @media (max-width:768px) {
   .orders-hero { padding: 64px 20px 24px }
   .orders-body { padding: 20px }
+  .order-row { align-items:flex-start; gap:16px }
+  .order-right { min-width:120px }
 }

@@ -1,23 +1,24 @@
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
-const { getBuyerOrders, getBuyerOrder } = require('../services/orders.service');
+const { createCheckout, cancelCheckout } = require('../services/checkout.service');
 
 const router = express.Router();
-
 router.use(requireAuth);
 
-router.get('/', async (req, res, next) => {
+router.post('/', async (req, res, next) => {
   try {
-    res.json({ orders: await getBuyerOrders(req.user.id) });
+    const checkout = await createCheckout(req.user.id);
+    res.status(201).json({ checkout });
   } catch (error) {
     next(error);
   }
 });
 
-router.get('/:id', async (req, res, next) => {
+router.post('/:orderId/cancel', async (req, res, next) => {
   try {
-    ensureUuid(req.params.id);
-    res.json({ order: await getBuyerOrder(req.params.id, req.user.id) });
+    ensureUuid(req.params.orderId);
+    const order = await cancelCheckout(req.params.orderId, req.user.id);
+    res.json({ order });
   } catch (error) {
     next(error);
   }

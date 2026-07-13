@@ -13,20 +13,24 @@ import {
   eliminarDelCarrito,
   cambiarCantidad,
 } from "../services/carrito";
+import { crearCheckout } from "../services/checkout";
+import { useAuth } from "../context/useAuth";
 
 import "../styles/CarritoScreen.css";
 
-const ENVIO = 49;
-const ENVIO_CENTAVOS = ENVIO * 100;
-
 export default function CarritoScreen() {
+  const { user, loading: authLoading } = useAuth();
   const [items, setItems] = useState([]);
   const [subtotalCentavos, setSubtotalCentavos] = useState(0);
+  const [totalCentavos, setTotalCentavos] = useState(0);
   const [cargando, setCargando] = useState(true);
+  const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let mounted = true;
+
+    if (authLoading || !user) return () => { mounted = false; };
 
     const actualizar = async () => {
       try {
@@ -35,11 +39,13 @@ export default function CarritoScreen() {
         if (!mounted) return;
         setItems(cart.items);
         setSubtotalCentavos(cart.subtotalCentavos);
+        setTotalCentavos(cart.totalCentavos);
       } catch (err) {
         if (!mounted) return;
         setError(err.message || "No se pudo cargar el carrito.");
         setItems([]);
         setSubtotalCentavos(0);
+        setTotalCentavos(0);
       } finally {
         if (mounted) setCargando(false);
       }
@@ -53,13 +59,14 @@ export default function CarritoScreen() {
       mounted = false;
       window.removeEventListener("carritoActualizado", actualizar);
     };
-  }, []);
+  }, [authLoading, user]);
 
   async function handleEliminar(id) {
     try {
       const cart = await eliminarDelCarrito(id);
       setItems(cart.items);
       setSubtotalCentavos(cart.subtotalCentavos);
+      setTotalCentavos(cart.totalCentavos);
     } catch (err) {
       setError(err.message || "No se pudo eliminar el producto.");
     }
@@ -71,13 +78,35 @@ export default function CarritoScreen() {
       const cart = await cambiarCantidad(item.id, nextQuantity);
       setItems(cart.items);
       setSubtotalCentavos(cart.subtotalCentavos);
+      setTotalCentavos(cart.totalCentavos);
     } catch (err) {
       setError(err.message || "No se pudo actualizar la cantidad.");
     }
   }
 
-  const subtotal = Math.round(subtotalCentavos / 100);
-  const total = Math.round((subtotalCentavos + (items.length ? ENVIO_CENTAVOS : 0)) / 100);
+  async function handlePagar() {
+    if (procesando) return;
+    try {
+      setProcesando(true);
+      setError("");
+      const checkout = await crearCheckout();
+      window.location.assign(checkout.url);
+    } catch (err) {
+      const messages = {
+        CART_EMPTY: "Tu carrito está vacío.",
+        STOCK_UNAVAILABLE: "Uno de los productos ya no tiene stock suficiente.",
+        MIXED_CURRENCY: "Los productos del carrito usan monedas distintas.",
+        CHECKOUT_IN_PROGRESS: "Ya hay un pago en proceso para esta cuenta.",
+        STRIPE_UNAVAILABLE: "Los pagos no están disponibles por el momento.",
+      };
+      setError(messages[err.details?.code] || err.message || "No se pudo iniciar el pago.");
+      setProcesando(false);
+    }
+  }
+
+  const formatMoney = (cents) => new Intl.NumberFormat("es-MX", {
+    style: "currency", currency: "MXN",
+  }).format(cents / 100);
 
   return (
     <div>
@@ -91,6 +120,13 @@ export default function CarritoScreen() {
         </p>
       </div>
 
+      {!authLoading && !user ? (
+        <div className="carrito-vacio">
+          <ShoppingBag size={56} strokeWidth={1} />
+          <p>Inicia sesión para consultar y pagar tu carrito.</p>
+          <Link to="/login" className="carrito-vacio-btn">Iniciar sesión</Link>
+        </div>
+      ) : <>
       {error && <div className="login-error">{error}</div>}
 
       {cargando ? (
@@ -181,26 +217,27 @@ export default function CarritoScreen() {
           <div className="carrito-resumen">
             <div className="carrito-resumen-fila">
               <span>Subtotal</span>
-              <span>${subtotal}</span>
+              <span>{formatMoney(subtotalCentavos)}</span>
             </div>
 
             <div className="carrito-resumen-fila">
-              <span>Envío</span>
-              <span>${ENVIO}</span>
+              <span>Recolección presencial</span>
+              <span>Gratis</span>
             </div>
 
             <div className="carrito-resumen-total">
               <span>Total</span>
-              <span>${total}</span>
+              <span>{formatMoney(totalCentavos)}</span>
             </div>
           </div>
 
-          <button className="carrito-btn-pagar">
-            Ir a pagar
+          <button className="carrito-btn-pagar" onClick={handlePagar} disabled={procesando}>
+            {procesando ? "Preparando pago..." : "Ir a pagar"}
             <ArrowRight size={16} />
           </button>
         </div>
       )}
+      </>}
     </div>
   );
 }

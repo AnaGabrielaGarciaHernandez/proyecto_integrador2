@@ -297,7 +297,7 @@ export default function ProductoScreen() {
 
           <div className="garantia-item">
             <Package size={18} />
-            <span>Envío seguro</span>
+            <span>Recolección presencial</span>
           </div>
 
           <div className="garantia-item">

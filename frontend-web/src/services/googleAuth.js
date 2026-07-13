@@ -4,6 +4,48 @@ export function hasGoogleClientId() {
   return Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID)
 }
 
+export async function renderGoogleButton(container, { text = 'signin_with', onCredential, onError }) {
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
+  if (!clientId) {
+    onError?.(new Error('Google login no está configurado'))
+    return
+  }
+
+  try {
+    await loadGoogleScript()
+
+    if (!window.google?.accounts?.id) {
+      throw new Error('Google Identity Services no está disponible')
+    }
+
+    window.google.accounts.id.initialize({
+      client_id: clientId,
+      callback: (response) => {
+        if (response.credential) {
+          onCredential(response.credential)
+          return
+        }
+
+        onError?.(new Error('Google no devolvió credenciales'))
+      },
+    })
+
+    container.innerHTML = ''
+    window.google.accounts.id.renderButton(container, {
+      type: 'standard',
+      theme: 'outline',
+      size: 'large',
+      text,
+      shape: 'rectangular',
+      logo_alignment: 'left',
+      locale: 'es',
+    })
+  } catch (error) {
+    onError?.(error)
+  }
+}
+
 export function requestGoogleIdToken() {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
 

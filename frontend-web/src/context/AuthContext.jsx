@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { get, post } from '../services/api'
-import { requestGoogleIdToken } from '../services/googleAuth'
 import { AuthContext } from './useAuth'
 
 export function AuthProvider({ children }) {
@@ -47,8 +46,7 @@ export function AuthProvider({ children }) {
     window.dispatchEvent(new Event('carritoActualizado'))
   }
 
-  async function loginWithGoogle() {
-    const idToken = await requestGoogleIdToken()
+  async function loginWithGoogleToken(idToken) {
     const data = await post('/auth/google', { id_token: idToken })
     setUser(data.user)
     window.dispatchEvent(new Event('authActualizado'))
@@ -61,7 +59,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
-    loginWithGoogle,
+    loginWithGoogleToken,
   }), [user, loading])
 
   return (

@@ -54,14 +54,20 @@
   color: #1a1a1a;
 }
 
-.btn-apple {
-  background: #000000;
-  color: #ffffff;
+.google-button-wrapper {
+  display: block;
+  width: 100%;
+  height: 50px;
 }
 
-.btn-facebook {
-  background: #1877F2;
-  color: #ffffff;
+.google-button-wrapper > div {
+  width: 100%;
+  height: 100%;
+}
+
+.google-button-wrapper iframe {
+  height: 100% !important;
+  width: 100% !important;
 }
 
 .btn-social-icono {

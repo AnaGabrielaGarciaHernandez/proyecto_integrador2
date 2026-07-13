@@ -46,26 +46,6 @@ function serializeUser(user) {
   };
 }
 
-async function optionalAuth(req, res, next) {
-  try {
-    const token = req.cookies?.[env.COOKIE_NAME] || getBearerToken(req);
-    if (!token) return next();
-
-    const payload = jwt.verify(token, env.JWT_SECRET);
-    const result = await query(
-      `SELECT id, email, full_name, auth_provider, role, phone, bio, is_active, created_at
-       FROM users
-       WHERE id = $1 AND is_active = true`,
-      [payload.sub],
-    );
-
-    req.user = result.rows[0] || null;
-    return next();
-  } catch (error) {
-    return next();
-  }
-}
-
 async function requireAuth(req, res, next) {
   try {
     const token = req.cookies?.[env.COOKIE_NAME] || getBearerToken(req);
@@ -108,7 +88,6 @@ function getBearerToken(req) {
 
 module.exports = {
   requireAuth,
-  optionalAuth,
   setSessionCookie,
   clearSessionCookie,
   serializeUser,

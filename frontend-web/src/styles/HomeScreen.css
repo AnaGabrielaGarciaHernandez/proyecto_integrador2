@@ -115,12 +115,6 @@
   display: none;
 }
 
-/* Dots */
-/* Barra de scroll */
-.carrusel-dots {
-  display: none;
-}
-
 .carrusel {
   display: flex;
   gap: 16px;

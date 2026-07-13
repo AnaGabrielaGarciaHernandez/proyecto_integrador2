@@ -307,8 +307,7 @@ Si usan JWT en vez de cookies, el frontend debera mandar el token en `Authorizat
   - Si el usuario quiere registrarse con Google, usar endpoint de Google login.
 
 - `HomeScreen.jsx` y `ExplorarScreen.jsx`
-  - Quitar imports desde `src/data/productos.js`.
-  - Llamar `GET /products`.
+  - Consumen el catalogo desde `GET /products` sin datasets locales.
   - Mostrar imagenes usando URLs firmadas devueltas por backend.
 
 - `ProductoScreen.jsx`
@@ -686,7 +685,7 @@ No intentes conectar todo al mismo tiempo. Orden recomendado:
 1. Crear `frontend-web/src/services/api.js`.
 2. Conectar login y registro.
 3. Reemplazar `localStorage.usuario` por `GET /auth/me`.
-4. Reemplazar `src/data/productos.js` por `GET /products`.
+4. Consumir el catalogo desde `GET /products`.
 5. Hacer que `ProductoScreen` use variantes reales.
 6. Reemplazar carrito en `localStorage` por endpoints.
 7. Conectar checkout.

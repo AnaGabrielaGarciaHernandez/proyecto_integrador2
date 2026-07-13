@@ -24,7 +24,7 @@ export async function getProduct(id) {
   return mapProduct(data.product)
 }
 
-export function mapProduct(product) {
+function mapProduct(product) {
   const variants = product.variants || []
   const firstAvailableVariant = variants.find((variant) => variant.stock > 0) || variants[0] || null
   const price = centsToPesos(product.price_cents)

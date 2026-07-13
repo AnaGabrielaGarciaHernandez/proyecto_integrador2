@@ -40,32 +40,6 @@ export async function renderGoogleButton(container, { text = 'signin_with', onCr
   }
 }
 
-export function requestGoogleIdToken() {
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
-
-  if (!clientId) {
-    return Promise.reject(new Error('Google login no está configurado'))
-  }
-
-  return loadGoogleScript().then(() => new Promise((resolve, reject) => {
-    if (!window.google?.accounts?.id) {
-      reject(new Error('Google Identity Services no está disponible'))
-      return
-    }
-
-    initializeGoogleIdentity(clientId, {
-      onCredential: resolve,
-      onError: reject,
-    })
-
-    window.google.accounts.id.prompt((notification) => {
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        reject(new Error('No se pudo abrir Google login'))
-      }
-    })
-  }))
-}
-
 function loadGoogleScript() {
   if (window.google?.accounts?.id) {
     return Promise.resolve()

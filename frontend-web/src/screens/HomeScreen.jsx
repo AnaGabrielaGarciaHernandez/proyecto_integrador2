@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Sparkles,
@@ -75,11 +75,9 @@ function Hero() {
 }
 
 function Carrusel({ productos, onAgregar }) {
-  const ref = useRef(null)
-
   return (
     <div className="carrusel-wrapper">
-      <div className="carrusel" ref={ref}>
+      <div className="carrusel">
         {productos.map((p) => (
           <ProductCard
             key={p.id}

@@ -52,9 +52,6 @@
   font-weight: 600;
   color: #fff;
 }
-.badge-tipo--oferta    { background: #b45309; }
-.badge-tipo--nuevo     { background: #1d4ed8; }
-.badge-tipo--destacado { background: #6d28d9; }
 
 .badge-descuento {
   background: #1a1a1a;
@@ -64,8 +61,6 @@
   font-size: 11px;
   font-weight: 600;
 }
-
-/* Favoritos eliminado: no mostrar corazón sobre las cards */
 
 /* ── Condición ── */
 .card-condicion {

@@ -10,7 +10,7 @@ export default function VenderScreen() {
   const [step, setStep] = useState(1)
   const [tipoCuenta, setTipoCuenta] = useState('persona')
   const [form, setForm] = useState({
-    nombreTienda: '', telefono: '', email: '', direccion: '', razon: ''
+    nombreTienda: '', telefono: '', email: '', direccion: ''
   })
   const [publicacion, setPublicacion] = useState({ nombre: '', categoria: '', precio: '', descripcion: '' })
   const [mensaje, setMensaje] = useState('')

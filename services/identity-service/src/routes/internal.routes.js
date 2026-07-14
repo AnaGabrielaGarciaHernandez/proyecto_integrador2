@@ -23,7 +23,8 @@ function createInternalRouter({ db, requireInternalToken }) {
       const result = await db.query(
         `SELECT s.id AS session_id, s.expires_at,
                 u.id, u.email, u.full_name, u.auth_provider, u.role,
-                u.phone, u.bio, u.is_active, u.created_at
+                u.phone, u.bio, u.is_active, u.created_at,
+                u.show_home_sell_banner
          FROM identity.sessions s
          JOIN identity.users u ON u.id = s.user_id
          WHERE s.id = $1 AND s.user_id = $2
@@ -58,7 +59,7 @@ function createInternalRouter({ db, requireInternalToken }) {
       const result = await db.transaction(async (client) => {
         const existing = await client.query(
           `SELECT id, email, full_name, auth_provider, role, phone, bio,
-                  is_active, created_at
+                  is_active, created_at, show_home_sell_banner
            FROM identity.users
            WHERE id = $1 AND is_active = true
            FOR UPDATE`,
@@ -73,7 +74,7 @@ function createInternalRouter({ db, requireInternalToken }) {
            SET role = $2
            WHERE id = $1
            RETURNING id, email, full_name, auth_provider, role, phone, bio,
-                     is_active, created_at`,
+                     is_active, created_at, show_home_sell_banner`,
           [params.data.id, input.data.role],
         );
         await client.query(

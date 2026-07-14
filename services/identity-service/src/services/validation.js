@@ -16,4 +16,13 @@ const googleSchema = z.object({
   id_token: z.string().min(1),
 });
 
-module.exports = { googleSchema, loginSchema, registerSchema };
+const preferencesSchema = z.object({
+  show_home_sell_banner: z.boolean(),
+});
+
+module.exports = {
+  googleSchema,
+  loginSchema,
+  preferencesSchema,
+  registerSchema,
+};

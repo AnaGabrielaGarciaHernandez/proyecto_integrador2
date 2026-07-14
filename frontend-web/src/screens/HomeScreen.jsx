@@ -5,10 +5,12 @@ import {
   Flame,
   RefreshCw,
   ChevronRight,
-  ShoppingCart
+  ShoppingCart,
+  X,
 } from 'lucide-react'
 
 import ProductCard from '../components/ProductCard'
+import { useAuth } from '../context/useAuth'
 import { getProducts } from '../services/products'
 
 import '../styles/HomeScreen.css'
@@ -91,10 +93,13 @@ function Carrusel({ productos, onAgregar }) {
 }
 
 export default function HomeScreen() {
+  const { user, loading: authLoading, updatePreferences } = useAuth()
   const [toast, setToast] = useState(null)
   const [productos, setProductos] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const [bannerSavingAccountId, setBannerSavingAccountId] = useState(null)
+  const [bannerError, setBannerError] = useState(null)
 
   useEffect(() => {
     let mounted = true
@@ -124,8 +129,36 @@ export default function HomeScreen() {
     }, 2500)
   }
 
+  async function handleOcultarBanner() {
+    const accountId = user?.id
+    if (!accountId) return
+
+    try {
+      setBannerSavingAccountId(accountId)
+      setBannerError(null)
+      await updatePreferences({ show_home_sell_banner: false })
+    } catch (err) {
+      setBannerError({
+        accountId,
+        message: err.message || 'No se pudo ocultar el aviso. Inténtalo de nuevo.',
+      })
+    } finally {
+      setBannerSavingAccountId((savingAccountId) => (
+        savingAccountId === accountId ? null : savingAccountId
+      ))
+    }
+  }
+
   const productosRecientes = productos.slice(0, 6)
   const productosVistos = productos.slice(6, 12)
+  const mostrarBannerVender = (
+    !authLoading
+    && (!user || user.preferences?.show_home_sell_banner === true)
+  )
+  const currentBannerError = bannerError && bannerError.accountId === user?.id
+    ? bannerError.message
+    : ''
+  const bannerSaving = bannerSavingAccountId === user?.id
 
   return (
     <div>
@@ -198,28 +231,48 @@ export default function HomeScreen() {
         <ChevronRight size={20} />
       </Link>
 
-      <div className="banner-vender">
-        <RefreshCw
-          size={28}
-          color="#52b788"
-          className="banner-vender-icono"
-        />
+      {mostrarBannerVender && (
+        <div className={`banner-vender ${user ? 'banner-vender--cerrable' : ''}`}>
+          {user && (
+            <button
+              type="button"
+              className="banner-vender-cerrar"
+              aria-label="No volver a mostrar este aviso"
+              aria-busy={bannerSaving}
+              disabled={bannerSaving}
+              onClick={handleOcultarBanner}
+            >
+              <X size={20} aria-hidden="true" />
+            </button>
+          )}
 
-        <div className="banner-vender-texto">
-          <h3>
-            ¿Quieres darle una segunda oportunidad a tu ropa que no usas?
-          </h3>
+          <RefreshCw
+            size={28}
+            color="#52b788"
+            className="banner-vender-icono"
+          />
 
-          <p>Publica gratis en EcoBazar</p>
+          <div className="banner-vender-texto">
+            <h3>
+              ¿Quieres darle una segunda oportunidad a tu ropa que no usas?
+            </h3>
+
+            <p>Publica gratis en EcoBazar</p>
+            {currentBannerError && (
+              <p className="banner-vender-error" role="alert">
+                {currentBannerError}
+              </p>
+            )}
+          </div>
+
+          <Link
+            to="/vender"
+            className="banner-vender-btn"
+          >
+            Publicar
+          </Link>
         </div>
-
-        <Link
-          to="/vender"
-          className="banner-vender-btn"
-        >
-          Publicar
-        </Link>
-      </div>
+      )}
     </div>
   )
 }

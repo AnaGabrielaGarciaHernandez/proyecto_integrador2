@@ -72,6 +72,9 @@ function serializeUser(user) {
     bio: user.bio,
     is_active: user.is_active,
     created_at: user.created_at,
+    preferences: {
+      show_home_sell_banner: user.show_home_sell_banner,
+    },
   };
 }
 

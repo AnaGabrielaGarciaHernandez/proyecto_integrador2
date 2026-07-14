@@ -10,11 +10,16 @@ const {
   setSessionCookie,
   verifySessionToken,
 } = require('../services/session');
-const { googleSchema, loginSchema, registerSchema } = require('../services/validation');
+const {
+  googleSchema,
+  loginSchema,
+  preferencesSchema,
+  registerSchema,
+} = require('../services/validation');
 
 const userColumns = `
   id, email, full_name, password_hash, auth_provider, role,
-  phone, bio, is_active, created_at
+  phone, bio, is_active, created_at, show_home_sell_banner
 `;
 
 function createAuthRouter({ db, config, privateKey, publicKey, googleClient, requireAuth }) {
@@ -121,6 +126,8 @@ function createAuthRouter({ db, config, privateKey, publicKey, googleClient, req
     res.json({ user: serializeUser(req.user) });
   });
 
+  router.patch('/preferences', requireAuth, createUpdatePreferencesHandler({ db }));
+
   router.post('/google', async (req, res, next) => {
     try {
       if (!config.GOOGLE_CLIENT_ID) {
@@ -156,6 +163,25 @@ function createAuthRouter({ db, config, privateKey, publicKey, googleClient, req
   });
 
   return router;
+}
+
+function createUpdatePreferencesHandler({ db }) {
+  return async function updatePreferences(req, res, next) {
+    try {
+      const input = parseBody(preferencesSchema, req.body);
+      const result = await db.query(
+        `UPDATE identity.users
+         SET show_home_sell_banner = $2
+         WHERE id = $1 AND is_active = true
+         RETURNING ${userColumns}`,
+        [req.user.id, input.show_home_sell_banner],
+      );
+      if (!result.rows[0]) throw createHttpError('Invalid session', 401);
+      res.json({ user: serializeUser(result.rows[0]) });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 async function findOrCreateGoogleUser(client, payload) {
@@ -255,4 +281,4 @@ function normalizeUniqueEmailError(error) {
   return createHttpError('Email already registered', 409);
 }
 
-module.exports = { createAuthRouter };
+module.exports = { createAuthRouter, createUpdatePreferencesHandler };

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   googleSchema,
   loginSchema,
+  preferencesSchema,
   registerSchema,
 } = require('../src/services/validation');
 
@@ -24,4 +25,20 @@ test('rejects malformed registration and login payloads', () => {
   }).success, false);
   assert.equal(loginSchema.safeParse({ email: 'person@example.com', password: '' }).success, false);
   assert.equal(googleSchema.safeParse({ id_token: '' }).success, false);
+});
+
+test('accepts only a present boolean home banner preference', () => {
+  assert.deepEqual(
+    preferencesSchema.parse({ show_home_sell_banner: false }),
+    { show_home_sell_banner: false },
+  );
+  assert.equal(preferencesSchema.safeParse({}).success, false);
+  assert.equal(
+    preferencesSchema.safeParse({ show_home_sell_banner: 'false' }).success,
+    false,
+  );
+  assert.equal(
+    preferencesSchema.safeParse({ show_home_sell_banner: null }).success,
+    false,
+  );
 });

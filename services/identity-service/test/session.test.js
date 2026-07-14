@@ -23,6 +23,7 @@ test('signs and verifies an RS256 session with user identity claims', () => {
     id: randomUUID(),
     role: 'cliente',
     full_name: 'Ada Lovelace',
+    show_home_sell_banner: false,
   };
   const options = {
     ...keys,
@@ -40,6 +41,8 @@ test('signs and verifies an RS256 session with user identity claims', () => {
   assert.equal(verified.jti, session.id);
   assert.equal(verified.role, user.role);
   assert.equal(verified.name, user.full_name);
+  assert.equal(verified.show_home_sell_banner, undefined);
+  assert.equal(verified.preferences, undefined);
   assert.ok(session.expiresAt > new Date());
 });
 
@@ -88,9 +91,12 @@ test('keeps the established public user response contract', () => {
     bio: null,
     is_active: true,
     created_at: new Date().toISOString(),
+    show_home_sell_banner: false,
     password_hash: 'must-not-leak',
   };
   const serialized = serializeUser(user);
   assert.equal(serialized.email, user.email);
+  assert.deepEqual(serialized.preferences, { show_home_sell_banner: false });
+  assert.equal(serialized.show_home_sell_banner, undefined);
   assert.equal(serialized.password_hash, undefined);
 });

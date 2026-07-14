@@ -18,6 +18,7 @@ const config = {
 test('routes every stable public API family to its owning service', () => {
   const cases = {
     '/api/auth/me': 'identity',
+    '/api/auth/preferences': 'identity',
     '/api/products': 'catalog',
     '/api/seller/profile': 'catalog',
     '/api/cart/items': 'cart',

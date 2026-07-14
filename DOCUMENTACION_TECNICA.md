@@ -4,21 +4,18 @@
 
 Este documento conserva y amplía la documentación técnica que anteriormente estaba en el `README.md`. El README raíz queda reservado para presentar el proyecto y explicar a cualquier integrante del equipo cómo levantarlo en Windows o macOS.
 
-## Estado De La Migración
+## Estado Actual
 
-La migración planificada está completa para el alcance funcional definido:
+EcoBazar se instala y opera exclusivamente con la arquitectura de microservicios:
 
-- El monolito `backend/` fue retirado y el SQL original se conserva en `infra/database/legacy/`.
-- La solución usa un API Gateway y seis microservicios de dominio: Identity, Catalog, Cart, Order, Payment y Moderation.
-- Los datos están separados en seis schemas PostgreSQL con roles independientes.
-- Checkout funciona como una Saga orquestada por Order, con reserva de inventario, Stripe Checkout y compensación.
-- Outbox/Inbox, RabbitMQ, cinco reintentos directos y DLQ están implementados sin CDC ni infraestructura adicional.
-- El frontend consume exclusivamente el API Gateway.
-- Compose, las pruebas automatizadas y el flujo Stripe sandbox fueron verificados.
+- Un API Gateway y seis servicios de dominio: Identity, Catalog, Cart, Order, Payment y Moderation.
+- Seis schemas PostgreSQL con roles independientes.
+- Checkout mediante una Saga orquestada por Order, con reserva de inventario, Stripe Checkout y compensación.
+- Outbox/Inbox, RabbitMQ, cinco reintentos directos y DLQ sin CDC ni infraestructura adicional.
+- Frontend conectado exclusivamente al API Gateway.
+- Instalación reproducible mediante Docker Compose y migraciones de schema versionadas.
 
-La auditoría de la base local confirmó que todos los UUID legacy de usuarios, productos, variantes y carritos existen en los schemas nuevos. Las órdenes y pagos actuales fueron creados después del corte. Las tablas de `public` permanecen como respaldo de la versión anterior.
-
-Dos áreas continúan fuera de alcance, tal como indicaba el plan: Admin y Reviews responden `501`. El contrato `moderation.seller_rating.changed.v1` y su consumidor en Catalog están preparados, pero Moderation no producirá ese evento hasta que Reviews tenga operaciones reales.
+Admin y Reviews continúan fuera de alcance y responden `501`. El contrato `moderation.seller_rating.changed.v1` y su consumidor en Catalog están preparados, pero Moderation no producirá ese evento hasta que Reviews tenga operaciones reales.
 
 ## Objetivo Del Sistema
 
@@ -103,13 +100,11 @@ packages/
   contracts/            Contratos Zod y nombres de eventos
   platform/             PostgreSQL, HTTP, Outbox/Inbox y RabbitMQ
 infra/
-  database/             Imagen, bootstrap, roles y SQL legacy
-  migration/            Imagen y documentación del migrador
+  database/             Imagen, bootstrap, roles y seed local opcional
+  migration/            Imagen para migraciones de schema y claves JWT
   rabbitmq/             Notas operativas de mensajería
 scripts/
   migrate-all.js
-  migrate-legacy-data.js
-  validate-migration.js
   generate-keys.js
 frontend-web/
 compose.yaml
@@ -404,6 +399,18 @@ Volúmenes persistentes:
 
 Un primer `docker compose up --build` construye imágenes, inicia PostgreSQL/RabbitMQ, ejecuta `migrate`, genera las claves RS256 y después inicia los servicios según sus healthchecks.
 
+El job `migrate` es permanente: crea y actualiza las tablas de los seis dominios en cualquier base nueva. Cada archivo aplicado queda registrado en `<schema>.schema_migrations`, por lo que repetir el job es seguro.
+
+### Datos Demo Opcionales
+
+Una base limpia incluye estructura y categorías, pero no usuarios ni productos. Para desarrollo local puede cargarse un vendedor y tres productos de ejemplo:
+
+```bash
+docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /opt/ecobazar/seeds/development.sql'
+```
+
+El seed es idempotente y está separado de las migraciones de schema. Sólo debe usarse en desarrollo.
+
 ## Variables De Entorno
 
 El archivo raíz `.env` se crea a partir de `.env.example` y es consumido por Compose.
@@ -476,50 +483,6 @@ npm run dev --workspace=@ecobazar/moderation-service
 npm run dev --workspace=@ecobazar/api-gateway
 npm run dev --workspace=frontend-web
 ```
-
-## Migración Desde El Monolito
-
-El corte se realiza en una ventana sin escrituras:
-
-1. Detener el monolito.
-2. Crear un dump de PostgreSQL.
-3. Crear una base/volumen destino nuevo.
-4. Restaurar el schema `public` en el destino.
-5. Crear schemas y roles.
-6. Aplicar migraciones.
-7. Copiar los datos legacy.
-8. Validar conteos, UUID, totales, stock, referencias y permisos.
-9. Iniciar microservicios.
-10. Mantener `public` sin cambios durante una versión.
-
-Respaldo:
-
-```bash
-PGPASSWORD='<admin-password>' pg_dump -h localhost -U '<admin-user>' -Fc -d bd_EcoBazar -f /tmp/ecobazar-before-microservices.dump
-```
-
-Corte usando Compose:
-
-```bash
-docker compose up -d postgres rabbitmq
-docker compose cp /tmp/ecobazar-before-microservices.dump postgres:/tmp/ecobazar-before-microservices.dump
-docker compose exec -T postgres pg_restore -U ecobazar_admin -d bd_EcoBazar --no-owner --schema=public /tmp/ecobazar-before-microservices.dump
-docker compose exec -T postgres psql -U ecobazar_admin -d bd_EcoBazar -f /docker-entrypoint-initdb.d/001_schemas_roles.sql
-docker compose run --rm migrate
-docker compose run --rm migrate node scripts/migrate-legacy-data.js
-docker compose run --rm migrate node scripts/validate-migration.js
-docker compose up --build -d
-```
-
-`migrate` aplica siempre las migraciones de schemas. Los scripts `migrate-legacy-data.js` y `validate-migration.js` se ejecutan únicamente durante un corte desde el monolito; una instalación fresca no debe ejecutarlos.
-
-La validación comprueba:
-
-- Conteos por tabla.
-- Sumas de stock, órdenes y pagos.
-- UUID y números de orden preservados.
-- Referencias huérfanas.
-- Cero permisos cruzados entre roles de servicio.
 
 ## Stripe Sandbox Local
 
@@ -602,27 +565,11 @@ docker compose down -v
 
 `down -v` elimina PostgreSQL, RabbitMQ y las claves JWT locales. Es destructivo y obliga a aplicar migraciones y generar nuevas claves en el siguiente inicio.
 
-## Rollback Del Corte Legacy
-
-Sólo es seguro antes de aceptar escrituras nuevas:
-
-1. Detener los microservicios.
-2. Conservar los schemas nuevos para diagnóstico.
-3. Crear un worktree del último commit monolítico:
-
-```bash
-git worktree add ../ecobazar-rollback 8780ca7
-```
-
-4. Iniciar ese `backend/` apuntando a `public` o restaurar el dump en una base separada.
-
-Después de aceptar escrituras en microservicios no se debe volver al monolito sin una reconciliación explícita.
-
 ## Alcance Y Mejoras Pendientes
 
 - Pickup presencial y gratuito.
 - Una cuenta Stripe cobra el total.
-- Los vendedores consultan pedidos reales; las demás rutas de vendedor y el flujo de publicación permanecen como placeholders/prototipo, igual que en el monolito.
+- Los vendedores consultan pedidos reales; las demás rutas de vendedor y el flujo de publicación permanecen como placeholders/prototipo.
 - Admin y Reviews conservan `501` hasta otra iteración.
 - El productor de rating en Moderation se habilitará junto con Reviews.
 - Stripe Connect, payouts, refunds y programación de pickup están fuera de alcance.
@@ -634,6 +581,7 @@ Después de aceptar escrituras en microservicios no se debe volver al monolito s
 
 - `packages/contracts/src/index.js`: contratos compartidos.
 - `packages/platform/src/events.js`: implementación Outbox/Inbox/RabbitMQ.
-- `scripts/validate-migration.js`: validación de corte.
-- `infra/migration/README.md`: procedimiento del migrador.
+- `scripts/migrate-all.js`: ejecución ordenada de migraciones de schema.
+- `infra/database/bootstrap/001_schemas_roles.sql`: extensiones, roles y schemas.
+- `infra/migration/README.md`: funcionamiento del job permanente `migrate`.
 - `frontend-web/README.md`: contrato específico del frontend con Gateway.

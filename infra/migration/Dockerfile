@@ -7,7 +7,6 @@ COPY packages ./packages
 COPY services ./services
 COPY frontend-web/package*.json ./frontend-web/
 COPY scripts ./scripts
-COPY infra ./infra
 
 RUN npm ci --omit=dev --no-audit --no-fund \
   && mkdir -p /run/secrets \

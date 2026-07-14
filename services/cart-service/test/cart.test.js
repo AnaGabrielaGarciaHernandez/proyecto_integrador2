@@ -13,7 +13,7 @@ const BUYER_ID = '10000000-0000-4000-8000-000000000001';
 const CART_ID = '20000000-0000-4000-8000-000000000001';
 const VARIANT_ID = '30000000-0000-4000-8000-000000000001';
 
-test('formatCart preserves the public monolith response and calculates totals in cents', () => {
+test('formatCart preserves the public API response and calculates totals in cents', () => {
   const cart = formatCart({ id: CART_ID, buyer_id: BUYER_ID }, [itemRow({ quantity: 2, line_total_cents: 30000 })]);
   assert.equal(cart.id, CART_ID);
   assert.equal(cart.user_id, BUYER_ID);

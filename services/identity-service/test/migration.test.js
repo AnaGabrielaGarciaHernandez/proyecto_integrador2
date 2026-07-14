@@ -17,7 +17,7 @@ test('identity migration isolates users, sessions and the simplified outbox', ()
   assert.doesNotMatch(migration, /CREATE TABLE[^;]+public\./i);
 });
 
-test('identity migration preserves legacy identifiers needed for the cutover', () => {
+test('identity schema keeps stable identifiers and optional payment profile fields', () => {
   assert.match(migration, /id uuid PRIMARY KEY DEFAULT gen_random_uuid\(\)/i);
   assert.match(migration, /avatar_file_id uuid/i);
   assert.match(migration, /stripe_customer_id varchar\(255\)/i);

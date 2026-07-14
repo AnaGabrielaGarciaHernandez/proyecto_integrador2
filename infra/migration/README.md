@@ -1,22 +1,21 @@
-# Migración Del Monolito
+# Migraciones De Schema
 
-La migración se ejecuta con una ventana sin escrituras y conserva las tablas de
-`public` como respaldo durante una versión.
+Esta imagen aplica la estructura vigente de los seis dominios en instalaciones
+nuevas y futuras actualizaciones de base de datos.
 
-1. Crear el `pg_dump` indicado en el README raíz.
-2. Aplicar `infra/database/bootstrap/001_schemas_roles.sql`.
-3. Ejecutar `node scripts/migrate-all.js`.
-4. Ejecutar `node scripts/migrate-legacy-data.js`.
-5. Ejecutar `node scripts/validate-migration.js`.
+`scripts/migrate-all.js` ejecuta, en orden, las migraciones de Identity, Catalog,
+Cart, Order, Payment y Moderation. Cada servicio usa su propio rol y registra los
+archivos aplicados en `<schema>.schema_migrations`.
 
-Los tres scripts son idempotentes para poder corregir una interrupción antes de
-abrir nuevamente las escrituras.
-
-Con Docker Compose, la imagen de migración incorpora el repositorio y sus
-dependencias. Los mismos pasos se ejecutan sin montar carpetas del host:
+Docker Compose ejecuta el job `migrate` automáticamente antes de iniciar los
+servicios. También puede repetirse manualmente; las migraciones ya registradas se
+omiten:
 
 ```bash
 docker compose run --rm migrate
-docker compose run --rm migrate node scripts/migrate-legacy-data.js
-docker compose run --rm migrate node scripts/validate-migration.js
 ```
+
+El bootstrap de extensiones, roles y schemas está en
+`infra/database/bootstrap/001_schemas_roles.sql`. No se deben borrar este job,
+las carpetas `services/*/migrations/` ni `packages/platform/src/db.js`: forman
+parte permanente del arranque de EcoBazar.

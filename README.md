@@ -26,7 +26,7 @@ flowchart LR
   PAY <--> MQ
 ```
 
-La explicación completa de servicios, schemas, APIs, Saga, Stripe, Outbox/Inbox, eventos, migración y operación está en [DOCUMENTACION_TECNICA.md](DOCUMENTACION_TECNICA.md).
+La explicación completa de servicios, schemas, APIs, Saga, Stripe, Outbox/Inbox, eventos, base de datos y operación está en [DOCUMENTACION_TECNICA.md](DOCUMENTACION_TECNICA.md).
 
 ## Requisitos
 
@@ -38,6 +38,20 @@ Para ejecutar toda la aplicación sólo necesitas:
 - Una cuenta Stripe sandbox y Stripe CLI únicamente si probarás pagos.
 
 No necesitas instalar PostgreSQL, RabbitMQ ni Node.js para levantar el proyecto con Docker.
+
+## Si Ya Tenías Una Versión Antigua
+
+Para este cambio de arquitectura es preferible hacer un clon nuevo en lugar de actualizar una carpeta antigua:
+
+1. Guarda fuera del repositorio cualquier archivo o cambio propio que necesites conservar.
+2. Renombra la carpeta antigua como respaldo.
+3. Clona nuevamente el repositorio siguiendo la sección de tu sistema operativo.
+4. Crea un `.env` nuevo desde `.env.example`.
+5. No copies `node_modules`, `.env`, `.secrets` ni datos locales de PostgreSQL de la versión anterior.
+
+Cuando la instalación nueva funcione, puedes eliminar la carpeta de respaldo.
+
+Si alguien ya alcanzó a levantar la versión de microservicios y también quiere borrar sus datos de prueba, debe ejecutar `docker compose down -v` desde esa instalación antes de eliminarla. Este comando es destructivo; no debe usarse si necesita conservar esa base local.
 
 ## Opción A: Windows 10/11 Con PowerShell
 
@@ -98,7 +112,7 @@ Guarda y cierra Notepad.
 docker compose up --build -d
 ```
 
-La primera ejecución tarda más porque descarga y construye las imágenes. Compose también crea PostgreSQL, RabbitMQ, aplica las migraciones y genera las claves JWT RS256.
+La primera ejecución tarda más porque descarga y construye las imágenes. Compose también crea PostgreSQL, RabbitMQ, aplica las migraciones de schema y genera las claves JWT RS256.
 
 Revisa el estado:
 
@@ -189,6 +203,23 @@ Direcciones útiles:
 - API Gateway: http://localhost:4000/api
 - Estado completo: http://localhost:4000/api/health
 - RabbitMQ Management: http://localhost:15672
+
+## Cargar Datos De Demostración
+
+Una instalación nueva crea la estructura y las categorías, pero empieza sin usuarios ni productos. Para cargar un vendedor y tres prendas de demostración, ejecuta desde la raíz en PowerShell o Terminal:
+
+```text
+docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /opt/ecobazar/seeds/development.sql'
+```
+
+Después recarga http://localhost:5173. El seed es idempotente y exclusivo para desarrollo local.
+
+Cuenta de vendedor demo:
+
+- Correo: `dev-vendedor@ecobazar.com`
+- Contraseña: `EcoBazar123!`
+
+Para comprar puedes registrar un usuario nuevo desde la aplicación.
 
 ## Configurar Stripe Sandbox En Windows O macOS
 
@@ -361,7 +392,7 @@ docker compose ps
 docker compose logs --tail=150 nombre-del-servicio
 ```
 
-Empieza revisando PostgreSQL, RabbitMQ y el job `migrate`.
+Empieza revisando PostgreSQL, RabbitMQ y el job de migraciones de schema `migrate`.
 
 ## Alcance Actual
 

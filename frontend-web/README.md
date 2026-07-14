@@ -34,4 +34,4 @@ npm run lint --workspace=frontend-web
 npm run build --workspace=frontend-web
 ```
 
-Las rutas públicas `/api/...` se mantienen estables durante la migración. La distribución entre Identity, Catalog, Cart, Order, Payment y Moderation es responsabilidad del Gateway.
+Las rutas públicas `/api/...` se mantienen estables. La distribución entre Identity, Catalog, Cart, Order, Payment y Moderation es responsabilidad del Gateway.

@@ -72,8 +72,9 @@ export function CheckoutSuccessScreen() {
 export function CheckoutCancelledScreen() {
   const [params] = useSearchParams()
   const orderId = params.get('order_id')
-  const [state, setState] = useState(orderId ? 'cancelling' : 'done')
+  const [state, setState] = useState(orderId ? 'cancelling' : 'error')
   const [error, setError] = useState(orderId ? '' : 'No se recibió un identificador de pedido válido.')
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -81,24 +82,66 @@ export function CheckoutCancelledScreen() {
       return () => { active = false }
     }
     cancelarCheckout(orderId)
-      .then(() => { if (active) setState('done') })
+      .then((order) => {
+        if (!active) return
+        if (order?.status === 'cancelled') {
+          setState('cancelled')
+          return
+        }
+        if (order?.status === 'paid') {
+          setState('paid')
+          return
+        }
+        setState('error')
+        setError('Stripe todavía no confirma la cancelación. La reserva permanece protegida; inténtalo nuevamente.')
+      })
       .catch((err) => {
         if (active) {
-          setState('done')
-          setError(err.message || 'No se pudo cancelar la reserva.')
+          setState('error')
+          setError(err.message || 'No se pudo confirmar la cancelación. El pago podría seguir abierto.')
         }
       })
     return () => { active = false }
-  }, [orderId])
+  }, [orderId, attempt])
+
+  const isCancelling = state === 'cancelling'
+  const isCancelled = state === 'cancelled'
+  const isPaid = state === 'paid'
 
   return (
     <div className="checkout-status-page">
       <section className="checkout-status-card">
-        <XCircle className="checkout-status-icon cancelled" size={60} />
-        <h1>{state === 'cancelling' ? 'Cancelando pago...' : 'Pago cancelado'}</h1>
-        <p>{state === 'cancelling' ? 'Estamos liberando la reserva de tus productos.' : 'No se realizó ningún cargo. Tus productos siguen en el carrito, sujetos a disponibilidad.'}</p>
+        {isPaid
+          ? <CheckCircle2 className="checkout-status-icon success" size={60} />
+          : isCancelled
+            ? <XCircle className="checkout-status-icon cancelled" size={60} />
+            : <Clock3 className="checkout-status-icon pending" size={60} />}
+        <h1>{isCancelling ? 'Cancelando pago...' : isCancelled ? 'Pago cancelado' : isPaid ? 'Pago confirmado' : 'Cancelación pendiente'}</h1>
+        <p>
+          {isCancelling
+            ? 'Estamos confirmando la cancelación con Stripe antes de liberar la reserva.'
+            : isCancelled
+              ? 'No se realizó ningún cargo. Tus productos siguen en el carrito, sujetos a disponibilidad.'
+              : isPaid
+                ? 'Stripe ya había confirmado el cobro. Consulta el estado de tu pedido.'
+                : 'No podemos asegurar todavía que la sesión de pago esté cancelada. No vuelvas a pagar y reintenta la cancelación.'}
+        </p>
         {error && <div className="checkout-status-error">{error}</div>}
-        <Link to="/carrito" className="checkout-status-primary">Regresar al carrito</Link>
+        {state === 'error' && orderId && (
+          <button
+            type="button"
+            className="checkout-status-primary"
+            onClick={() => {
+              setState('cancelling')
+              setError('')
+              setAttempt((value) => value + 1)
+            }}
+          >
+            Reintentar cancelación
+          </button>
+        )}
+        {isCancelled && <Link to="/carrito" className="checkout-status-primary">Regresar al carrito</Link>}
+        {isPaid && <Link to="/pedidos" className="checkout-status-primary">Ver mi pedido</Link>}
         <Link to="/explorar" className="checkout-status-secondary">Seguir explorando</Link>
       </section>
     </div>

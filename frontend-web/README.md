@@ -1,16 +1,37 @@
-# React + Vite
+# EcoBazar Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicación React 19 y Vite. El navegador se comunica exclusivamente con el API Gateway; nunca debe llamar directamente a un microservicio.
 
-Currently, two official plugins are available:
+## Variables
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```env
+VITE_API_URL=http://localhost:4000/api
+VITE_GOOGLE_CLIENT_ID=
+```
 
-## React Compiler
+Las sesiones usan cookies HTTP-only, por lo que el cliente HTTP debe conservar `credentials: 'include'`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Desarrollo
 
-## Expanding the ESLint configuration
+Desde la raíz del monorepo:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install
+npm run dev --workspace=frontend-web
+```
+
+O con toda la arquitectura:
+
+```bash
+npm run keys:generate
+docker compose up --build
+```
+
+## Validación
+
+```bash
+npm run lint --workspace=frontend-web
+npm run build --workspace=frontend-web
+```
+
+Las rutas públicas `/api/...` se mantienen estables durante la migración. La distribución entre Identity, Catalog, Cart, Order, Payment y Moderation es responsabilidad del Gateway.

@@ -1,6 +1,28 @@
 {
+  "name": "ecobazar",
+  "version": "2.0.0",
+  "private": true,
+  "description": "EcoBazar microservices monorepo",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "frontend-web"
+  ],
+  "scripts": {
+    "check": "npm run check --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspace=frontend-web",
+    "build": "npm run build --workspaces --if-present",
+    "keys:generate": "node scripts/generate-keys.js",
+    "compose:up": "docker compose up --build",
+    "compose:down": "docker compose down",
+    "compose:logs": "docker compose logs -f"
+  },
+  "engines": {
+    "node": ">=24"
+  },
   "dependencies": {
-    "axios": "^1.18.0",
-    "react-router-dom": "^7.17.0"
+    "dotenv": "^17.4.2",
+    "pg": "^8.22.0"
   }
 }

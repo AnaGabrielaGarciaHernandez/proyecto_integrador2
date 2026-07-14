@@ -1,0 +1,7 @@
+.git
+.secrets
+**/.env
+**/node_modules
+**/dist
+coverage
+dogfood-output

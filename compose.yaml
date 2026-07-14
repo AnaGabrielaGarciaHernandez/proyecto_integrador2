@@ -1,0 +1,242 @@
+name: ecobazar
+
+x-service-common: &service-common
+  restart: unless-stopped
+  networks: [ecobazar-internal]
+  healthcheck:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health/ready >/dev/null || exit 1"]
+    interval: 5s
+    timeout: 3s
+    retries: 12
+    start_period: 10s
+  environment: &common-environment
+    NODE_ENV: development
+    RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-ecobazar}:${RABBITMQ_DEFAULT_PASS:-ecobazar_dev}@rabbitmq:5672
+    INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change_this_internal_token_32_chars}
+    CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:5173}
+  depends_on:
+    postgres:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+    jwt-keys:
+      condition: service_completed_successfully
+
+x-migration-image: &migration-image
+  image: ecobazar-migration:local
+  build:
+    context: .
+    dockerfile: infra/migration/Dockerfile
+  working_dir: /app
+
+services:
+  postgres:
+    image: ecobazar-postgres:local
+    build:
+      context: .
+      dockerfile: infra/database/Dockerfile
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bd_EcoBazar}
+      POSTGRES_USER: ${POSTGRES_USER:-ecobazar_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecobazar_admin_dev}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    ports:
+      - "${POSTGRES_HOST_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ecobazar_admin} -d ${POSTGRES_DB:-bd_EcoBazar}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [ecobazar-internal]
+
+  rabbitmq:
+    image: rabbitmq:4.3.2-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-ecobazar}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-ecobazar_dev}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    ports:
+      - "${RABBITMQ_HOST_PORT:-5672}:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [ecobazar-internal]
+
+  migrate:
+    <<: *migration-image
+    command: ["node", "scripts/migrate-all.js"]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-bd_EcoBazar}
+      POSTGRES_USER: ${POSTGRES_USER:-ecobazar_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecobazar_admin_dev}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-ecobazar}:${RABBITMQ_DEFAULT_PASS:-ecobazar_dev}@rabbitmq:5672
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change_this_internal_token_32_chars}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [ecobazar-internal]
+
+  jwt-keys:
+    <<: *migration-image
+    command: ["node", "scripts/generate-keys.js"]
+    environment:
+      JWT_KEYS_DIR: /run/secrets
+    volumes:
+      - jwt-keys:/run/secrets
+    network_mode: none
+
+  identity-service:
+    <<: *service-common
+    build:
+      context: .
+      dockerfile: services/identity-service/Dockerfile
+    environment:
+      <<: *common-environment
+      PORT: 4001
+      DATABASE_URL: postgres://ecobazar_identity:identity_dev@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}
+      COOKIE_NAME: ${COOKIE_NAME:-ecobazar_session}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-private.pem
+    volumes:
+      - jwt-keys:/run/secrets:ro
+
+  catalog-service:
+    <<: *service-common
+    build:
+      context: .
+      dockerfile: services/catalog-service/Dockerfile
+    environment:
+      <<: *common-environment
+      PORT: 4002
+      DATABASE_URL: postgres://ecobazar_catalog:catalog_dev@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}
+
+  cart-service:
+    <<: *service-common
+    build:
+      context: .
+      dockerfile: services/cart-service/Dockerfile
+    environment:
+      <<: *common-environment
+      PORT: 4003
+      DATABASE_URL: postgres://ecobazar_cart:cart_dev@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}
+      CATALOG_SERVICE_URL: http://catalog-service:4002
+
+  order-service:
+    <<: *service-common
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    environment:
+      <<: *common-environment
+      PORT: 4004
+      DATABASE_URL: postgres://ecobazar_ordering:ordering_dev@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}
+      CART_SERVICE_URL: http://cart-service:4003
+      CATALOG_SERVICE_URL: http://catalog-service:4002
+      PAYMENT_SERVICE_URL: http://payment-service:4005
+
+  payment-service:
+    <<: *service-common
+    build:
+      context: .
+      dockerfile: services/payment-service/Dockerfile
+    environment:
+      <<: *common-environment
+      PORT: 4005
+      DATABASE_URL: postgres://ecobazar_payment:payment_dev@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+
+  moderation-service:
+    <<: *service-common
+    build:
+      context: .
+      dockerfile: services/moderation-service/Dockerfile
+    environment:
+      <<: *common-environment
+      PORT: 4006
+      DATABASE_URL: postgres://ecobazar_moderation:moderation_dev@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}
+
+  api-gateway:
+    <<: *service-common
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    environment:
+      <<: *common-environment
+      PORT: 4000
+      COOKIE_NAME: ${COOKIE_NAME:-ecobazar_session}
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
+      IDENTITY_SERVICE_URL: http://identity-service:4001
+      CATALOG_SERVICE_URL: http://catalog-service:4002
+      CART_SERVICE_URL: http://cart-service:4003
+      ORDER_SERVICE_URL: http://order-service:4004
+      PAYMENT_SERVICE_URL: http://payment-service:4005
+      MODERATION_SERVICE_URL: http://moderation-service:4006
+    volumes:
+      - jwt-keys:/run/secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      jwt-keys:
+        condition: service_completed_successfully
+      identity-service:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      cart-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      moderation-service:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+
+  frontend-web:
+    build:
+      context: .
+      dockerfile: frontend-web/Dockerfile
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:4000/api
+      VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    ports:
+      - "5173:5173"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173 >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    networks: [ecobazar-internal]
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
+  jwt-keys:
+
+networks:
+  ecobazar-internal:
+    driver: bridge

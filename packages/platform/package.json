@@ -1,0 +1,19 @@
+{
+  "name": "@ecobazar/platform",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "check": "find src -name '*.js' -exec node --check {} \\;",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@ecobazar/contracts": "^1.0.0",
+    "amqplib": "^0.10.9",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "helmet": "^8.2.0",
+    "pg": "^8.22.0"
+  }
+}

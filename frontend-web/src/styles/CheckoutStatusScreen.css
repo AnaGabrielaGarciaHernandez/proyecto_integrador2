@@ -23,7 +23,7 @@
 .checkout-status-card p { color: var(--color-text-muted); line-height: 1.6; margin: 0 0 24px; }
 .checkout-status-error { color: #b91c1c; background: #fef2f2; border-radius: 10px; padding: 12px; margin-bottom: 18px; }
 .checkout-status-primary, .checkout-status-secondary { display: block; border-radius: 12px; padding: 13px 18px; font-weight: 700; }
-.checkout-status-primary { color: #fff; background: var(--color-sidebar-bg); }
+.checkout-status-primary { width: 100%; color: #fff; background: var(--color-sidebar-bg); border: 0; cursor: pointer; text-align: center; }
 .checkout-status-secondary { color: var(--color-text-muted); margin-top: 8px; }
 
 @media (max-width: 768px) {

@@ -1,0 +1,31 @@
+{
+  "name": "@ecobazar/api-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EcoBazar public API gateway",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "check": "find src test -name '*.js' -exec node --check {} \\;",
+    "test": "npm run check && node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@ecobazar/platform": "*",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.2.0",
+    "http-proxy-middleware": "^3.0.5",
+    "jsonwebtoken": "^9.0.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

@@ -157,7 +157,5 @@ function isConfirmedWithoutCharge(response) {
 module.exports = {
   startCompensationWorker,
   reconcileExpiredCheckouts,
-  reconcileExpiredCheckout,
   isConfirmedWithoutCharge,
-  buildPaymentCheckoutRequest,
 };

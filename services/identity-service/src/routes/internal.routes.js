@@ -111,4 +111,4 @@ function createInternalRouter({ db, requireInternalToken }) {
   return router;
 }
 
-module.exports = { createInternalRouter, paramsSchema, roleSchema };
+module.exports = { createInternalRouter };

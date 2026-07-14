@@ -214,7 +214,6 @@ module.exports = {
   deleteItem,
   getCartSnapshot,
   getOrCreateCart,
-  getCartItems,
   formatCart,
   ensureAvailableVariant,
 };

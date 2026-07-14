@@ -11,9 +11,6 @@
   "dependencies": {
     "@ecobazar/contracts": "^1.0.0",
     "amqplib": "^0.10.9",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "helmet": "^8.2.0",
     "pg": "^8.22.0"
   }
 }

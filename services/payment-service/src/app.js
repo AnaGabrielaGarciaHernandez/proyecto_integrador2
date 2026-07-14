@@ -76,4 +76,4 @@ function validationError(error, req, res, next) {
   return next(error);
 }
 
-module.exports = { createApp, ensureUuid, validationError };
+module.exports = { createApp };

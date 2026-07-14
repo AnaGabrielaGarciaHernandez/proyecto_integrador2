@@ -21,4 +21,4 @@ function loadPem({ inlineValue, filePath, label }) {
   throw new Error(`${label} is required`);
 }
 
-module.exports = { loadPrivateKey, loadPem };
+module.exports = { loadPrivateKey };

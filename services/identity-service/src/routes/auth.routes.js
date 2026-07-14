@@ -255,14 +255,4 @@ function normalizeUniqueEmailError(error) {
   return createHttpError('Email already registered', 409);
 }
 
-module.exports = {
-  createAuthRouter,
-  createSession,
-  enqueueUserRegistered,
-  findOrCreateGoogleUser,
-  googleSchema,
-  loginSchema,
-  normalizeUniqueEmailError,
-  parseBody,
-  registerSchema,
-};
+module.exports = { createAuthRouter };

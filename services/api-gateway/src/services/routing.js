@@ -36,9 +36,7 @@ function matchesPrefix(pathname, prefix) {
 }
 
 module.exports = {
-  ROUTES,
   createServiceTargets,
-  matchesPrefix,
   resolveService,
   resolveTarget,
 };

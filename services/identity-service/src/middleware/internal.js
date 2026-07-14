@@ -21,4 +21,4 @@ function safeEqual(leftValue, rightValue) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-module.exports = { createRequireInternalToken, safeEqual };
+module.exports = { createRequireInternalToken };

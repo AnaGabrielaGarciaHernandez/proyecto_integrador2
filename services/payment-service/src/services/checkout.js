@@ -203,10 +203,4 @@ function stripeStateUncertain(cause, orderId) {
 
 module.exports = {
   createPaymentCheckoutService,
-  verifyPaymentMatches,
-  publicPayment,
-  publicCheckout,
-  isAmbiguousStripeError,
-  stripeUnavailable,
-  stripeStateUncertain,
 };

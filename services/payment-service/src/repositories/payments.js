@@ -210,4 +210,4 @@ function normalizePayment(row) {
   return row ? { ...row, amount_cents: Number(row.amount_cents) } : null;
 }
 
-module.exports = { createPaymentsRepository, emitPaymentEvent, normalizePayment };
+module.exports = { createPaymentsRepository };

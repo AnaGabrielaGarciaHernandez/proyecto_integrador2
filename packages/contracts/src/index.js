@@ -74,7 +74,6 @@ const PaymentCheckoutRequestSchema = z.object({
 module.exports = {
   EVENT_TYPES,
   EventEnvelopeSchema,
-  CartItemSnapshotSchema,
   CartSnapshotSchema,
   InventoryReservationRequestSchema,
   PaymentCheckoutRequestSchema,

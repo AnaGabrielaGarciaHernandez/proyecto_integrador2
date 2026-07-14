@@ -82,4 +82,4 @@ function createPaymentEventHandler({ orders, catalogClient }) {
   };
 }
 
-module.exports = { createPaymentEventHandler, FAILURE_EVENTS };
+module.exports = { createPaymentEventHandler };

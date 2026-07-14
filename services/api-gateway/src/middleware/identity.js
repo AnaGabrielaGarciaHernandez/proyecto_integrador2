@@ -107,11 +107,7 @@ function getBearerToken(req) {
 }
 
 module.exports = {
-  IDENTITY_HEADERS,
-  claimsToIdentity,
   createIdentityMiddleware,
-  getBearerToken,
-  introspectSession,
   sanitizeHeaderValue,
   stripUntrustedHeaders,
 };

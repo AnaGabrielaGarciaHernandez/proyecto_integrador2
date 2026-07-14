@@ -55,4 +55,4 @@ async function updateSellerRating(client, payload) {
   );
 }
 
-module.exports = { createCatalogEventHandler, upsertUserProjection, updateSellerRating };
+module.exports = { createCatalogEventHandler };

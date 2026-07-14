@@ -97,4 +97,4 @@ function validationError(error, req, res, next) {
   return next(error);
 }
 
-module.exports = { createApp, validationError };
+module.exports = { createApp };

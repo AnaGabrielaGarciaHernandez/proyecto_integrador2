@@ -87,4 +87,4 @@ function parse(schema, value, message) {
   return result.data;
 }
 
-module.exports = { createCartRouter, requireGatewayUser, AddItemSchema, UpdateItemSchema };
+module.exports = { createCartRouter };

@@ -12,7 +12,6 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
-    "@ecobazar/contracts": "^1.0.0",
     "@ecobazar/platform": "^1.0.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",

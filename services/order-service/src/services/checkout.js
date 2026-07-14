@@ -216,4 +216,4 @@ function toIso(value) {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
-module.exports = { createCheckoutService, formatCheckout, isReusableCheckout, toIso };
+module.exports = { createCheckoutService, formatCheckout };

@@ -66,4 +66,4 @@ function parse(schema, value) {
   return result.data;
 }
 
-module.exports = { createInternalRouter, ResolveVariantsSchema };
+module.exports = { createInternalRouter };

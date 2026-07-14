@@ -378,4 +378,4 @@ function toPublicOrder(order) {
   return result;
 }
 
-module.exports = { createOrdersRepository, validateCart, normalizeOrder, toPublicOrder };
+module.exports = { createOrdersRepository, validateCart };

@@ -45,4 +45,4 @@ function parse(schema, value, message) {
   return result.data;
 }
 
-module.exports = { createProductsRouter, ListProductsSchema };
+module.exports = { createProductsRouter };

@@ -78,7 +78,6 @@ function serializeUser(user) {
 module.exports = {
   createSessionToken,
   verifySessionToken,
-  getBearerToken,
   getSessionToken,
   sessionCookieOptions,
   setSessionCookie,

@@ -213,8 +213,6 @@ async function startConsumer({ db, bus, serviceName, queue, bindings, handler, m
 }
 
 module.exports = {
-  EVENTS_EXCHANGE,
-  DLX_EXCHANGE,
   createEvent,
   insertOutbox,
   createRabbitBus,

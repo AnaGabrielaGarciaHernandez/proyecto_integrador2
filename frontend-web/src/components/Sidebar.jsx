@@ -231,18 +231,7 @@ export default function Sidebar({ abierto, onCerrar }) {
             Atención al cliente
           </NavLink>
 
-          <NavLink
-            to="/faq"
-            onClick={onCerrar}
-            className={({ isActive }) =>
-              isActive
-                ? 'nav-item nav-item-sm active'
-                : 'nav-item nav-item-sm'
-            }
-          >
-            <HelpCircle size={15} />
-            Preguntas frecuentes
-          </NavLink>
+          {/* Preguntas frecuentes integrado en pantalla de Soporte */}
 
         </nav>
 

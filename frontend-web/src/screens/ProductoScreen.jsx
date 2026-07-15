@@ -94,10 +94,6 @@ export default function ProductoScreen() {
 
   const varianteSeleccionada = producto.variants.find((variant) => variant.id === varianteId)
 
-  const ahorro = producto.precioOriginal > 0
-    ? Math.round(((producto.precioOriginal - producto.precio) / producto.precioOriginal) * 100)
-    : 0
-
   return (
     <div className="producto-contenedor">
 
@@ -190,15 +186,7 @@ export default function ProductoScreen() {
                 <span className="producto-precio-actual">
                   ${producto.precio}
                 </span>
-
-                <span className="producto-precio-original">
-                  ${producto.precioOriginal}
-                </span>
               </div>
-
-              <span className="producto-ahorro">
-                Ahorras {ahorro}%
-              </span>
 
             </div>
 

@@ -13,7 +13,6 @@ export default function ProductCard({ producto, onAgregar }) {
     nombre,
     categoria,
     precio,
-    precioOriginal,
     imagen,
     vendedor,
     talla,
@@ -22,10 +21,6 @@ export default function ProductCard({ producto, onAgregar }) {
     varianteDisponible,
     totalStock,
   } = producto;
-
-  const descuento = Math.round(
-    ((precioOriginal - precio) / precioOriginal) * 100,
-  );
 
   function irAlProducto() {
     navigate(`/producto/${id}`);
@@ -63,8 +58,6 @@ export default function ProductCard({ producto, onAgregar }) {
               {tipo}
             </span>
           )}
-
-          <span className="badge-descuento">-{descuento}%</span>
         </div>
 
         <div className="card-condicion">
@@ -95,8 +88,6 @@ export default function ProductCard({ producto, onAgregar }) {
           <div className="card-precio-carrito">
             <div className="card-precios">
               <span className="precio-actual">${precio}</span>
-
-              <span className="precio-original">${precioOriginal}</span>
             </div>
 
             <button

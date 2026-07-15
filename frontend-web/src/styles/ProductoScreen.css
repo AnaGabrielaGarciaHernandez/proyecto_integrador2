@@ -50,12 +50,6 @@
   color: var(--color-text);
 }
 
-.producto-precio-original {
-  font-size: 16px;
-  color: var(--color-text-muted);
-  text-decoration: line-through;
-}
-
 .producto-talla-box {
   text-align: center;
 }
@@ -80,18 +74,6 @@
   font-size: 14px;
   font-weight: 700;
   color: var(--color-text);
-}
-
-.producto-ahorro {
-  display: inline-flex;
-  align-items: center;
-  margin-top: 8px;
-  background: #166534;
-  color: #ffffff;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
 }
 
 /* Vendedor */

@@ -50,12 +50,7 @@ const preguntas = [
   {
     titulo: '¿Cómo funciona la entrega?',
     respuesta:
-      'Ofrecemos opciones de envío y entrega local. El vendedor selecciona métodos disponibles; encontrarás información de seguimiento en tu pedido.'
-  },
-  {
-    titulo: '¿Qué es el regateo?',
-    respuesta:
-      'El regateo es una oferta que puedes proponer al vendedor para negociar el precio. No todos los vendedores aceptan ofertas.'
+      'El vendedor selecciona métodos de entrega disponibles y encontrarás información de seguimiento en tu pedido.'
   }
 ]
 

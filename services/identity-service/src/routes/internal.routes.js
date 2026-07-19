@@ -109,6 +109,45 @@ function createInternalRouter({ db, requireInternalToken }) {
     }
   });
 
+  router.get('/users', async (req, res, next) => {
+    try {
+      const result = await db.query(
+        `SELECT id, email, full_name, auth_provider, role, phone, is_active, created_at
+         FROM identity.users
+         ORDER BY created_at DESC`
+      );
+      res.json({ users: result.rows });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.patch('/users/:id/suspend', async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { is_active } = req.body;
+      const result = await db.query(
+        `UPDATE identity.users SET is_active = $1 WHERE id = $2 RETURNING id`,
+        [is_active, id]
+      );
+      if (result.rowCount === 0) throw createHttpError('User not found', 404);
+      res.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.delete('/users/:id', async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const result = await db.query(`DELETE FROM identity.users WHERE id = $1`, [id]);
+      if (result.rowCount === 0) throw createHttpError('User not found', 404);
+      res.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 }
 

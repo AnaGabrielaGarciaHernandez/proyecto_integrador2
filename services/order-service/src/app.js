@@ -6,6 +6,8 @@ const {
   errorHandler,
 } = require('@ecobazar/platform');
 const { requireUser, requireRole, ensureUuid } = require('./http/identity');
+const env = require('./config/env');
+const { createInternalRouter } = require('./http/internal');
 
 function createApp({ db, orders, checkoutService }) {
   const app = express();
@@ -90,6 +92,8 @@ function createApp({ db, orders, checkoutService }) {
       next(error);
     }
   });
+
+  app.use('/internal', createInternalRouter({ db, internalToken: env.INTERNAL_SERVICE_TOKEN }));
 
   app.use(notFound);
   app.use(validationError);

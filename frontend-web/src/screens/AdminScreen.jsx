@@ -1,301 +1,213 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Users, ShoppingBag, Flag,
-  ChevronDown, ChevronUp, CheckCircle,
-  XCircle, PauseCircle, MessageSquare,
-  Trash2, Clock
+  Users, CheckCircle, XCircle, PauseCircle, Trash2, Shield, Activity, BarChart
 } from 'lucide-react'
+import { get, patch, post, del } from '../services/api'
 import '../styles/AdminScreen.css'
-
-
-const vendedoresData = [
-  {
-    id: 1, nombre: 'ArteNatural MX', contacto: 'María González Ruiz',
-    fecha: '2026-06-09', status: 'pendiente',
-    email: 'maria@artnatural.mx', telefono: '555-123-4567',
-    rfc: 'GORM850301HDF',
-    descripcion: 'Vendo macetas artesanales y plantas de ornamento cultivadas orgánicamente en mi huerto familiar en Oaxaca.',
-  },
-  {
-    id: 2, nombre: 'TejidoVerde', contacto: 'Carlos Pérez López',
-    fecha: '2026-06-08', status: 'pendiente',
-    email: 'carlos@tejidoverde.mx', telefono: '555-987-6543',
-    rfc: 'PELC900215ABC',
-    descripcion: 'Tienda de ropa tejida a mano con fibras naturales y tintes vegetales.',
-  },
-  {
-    id: 3, nombre: 'JaboneríaBotánica', contacto: 'Ana Martínez Vega',
-    fecha: '2026-06-05', status: 'aprobado',
-    email: 'ana@jaboneria.mx', telefono: '555-456-7890',
-    rfc: 'MAVA880530XYZ',
-    descripcion: 'Jabones artesanales con ingredientes botánicos locales.',
-  },
-  {
-    id: 4, nombre: 'SemillaViva', contacto: 'Roberto Díaz Sánchez',
-    fecha: '2026-06-04', status: 'rechazado',
-    email: 'roberto@semillaviva.mx', telefono: '555-321-0987',
-    rfc: 'DISR750812DEF',
-    descripcion: 'Semillas y plantas nativas de la región.',
-  },
-]
-
-const productosData = [
-  {
-    id: 1, imagen: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=100',
-    nombre: 'Sudadera vintage Nike — gris oversize', vendedor: 'Sofía R.', status: 'activo',
-    descripcion: 'Sudadera Nike vintage talla L en perfecto estado. Solo se usó en invierno pasado. Sin manchas ni roturas. Lavada y lista para usar.',
-    precio: 180,
-  },
-  {
-    id: 2, imagen: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=100',
-    nombre: 'Hoodie universitario UNAM azul — talla M', vendedor: 'VintageCloset DGO', status: 'activo',
-    descripcion: 'Hoodie oficial UNAM, talla M. Poco uso, en buen estado.', precio: 150,
-  },
-  {
-    id: 3, imagen: 'https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=100',
-    nombre: 'Sudadera Thrasher negra — talla S', vendedor: 'Miguel A.', status: 'activo',
-    descripcion: 'Sudadera Thrasher original talla S, solo usada dos veces.', precio: 220,
-  },
-  {
-    id: 4, imagen: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=100',
-    nombre: "Chaqueta de jean Levi's — talla M", vendedor: 'Fernanda V.', status: 'activo',
-    descripcion: "Chaqueta de mezclilla Levi's original talla M.", precio: 320,
-  },
-  {
-    id: 5, imagen: 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=100',
-    nombre: 'Bomber jacket verde militar — talla L', vendedor: 'ThriftDurango', status: 'activo',
-    descripcion: 'Bomber jacket verde militar, talla L. Excelente estado.', precio: 280,
-  },
-]
-
-const reportesData = [
-  {
-    id: 1, tipo: 'Producto', fecha: '2026-06-09', status: 'pendiente',
-    nombre: 'Bolsa de tela tejida a mano',
-    motivo: 'Descripción engañosa',
-    descripcion: 'El producto que recibí no corresponde a la foto.',
-  },
-  {
-    id: 2, tipo: 'Vendedor', fecha: '2026-06-08', status: 'pendiente',
-    nombre: 'PielNatural',
-    motivo: 'No entregó el pedido',
-    descripcion: 'Pagué hace 3 semanas y el vendedor no responde mis mensajes.',
-  },
-  {
-    id: 3, tipo: 'Producto', fecha: '2026-06-05', status: 'resuelto',
-    nombre: 'Tenis de algodón reciclado',
-    motivo: 'Calidad inferior',
-    descripcion: 'Los tenis se desarmaron a la semana de uso.',
-  },
-]
-
-const statusVendedor = {
-  pendiente: { label: 'Pendiente', clase: 'status-pendiente' },
-  aprobado:  { label: 'Aprobado',  clase: 'status-aprobado'  },
-  rechazado: { label: 'Rechazado', clase: 'status-rechazado' },
-}
 
 export default function AdminScreen() {
   const location = useLocation()
   const navigate = useNavigate()
-  const tab = location.pathname.includes('productos')
-    ? 'productos'
+  
+  const tab = location.pathname.includes('solicitudes')
+    ? 'solicitudes'
     : location.pathname.includes('reportes')
     ? 'reportes'
-    : 'vendedores'
-  const [expandido, setExpandido]   = useState(null)
-  const [vendedores, setVendedores] = useState(vendedoresData)
-  const [productos, setProductos]   = useState(productosData)
-  const [reportes, setReportes]     = useState(reportesData)
+    : 'usuarios'
 
-  const pendientesVendedores = vendedores.filter(v => v.status === 'pendiente').length
-  const pendientesReportes   = reportes.filter(r => r.status === 'pendiente').length
+  const [users, setUsers] = useState([])
+  const [applications, setApplications] = useState([])
+  const [reports, setReports] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  function toggleExpandido(id) {
-    setExpandido(expandido === id ? null : id)
+  useEffect(() => {
+    fetchData()
+  }, [tab])
+
+  async function fetchData() {
+    setLoading(true)
+    setError('')
+    try {
+      if (tab === 'usuarios') {
+        const data = await get('/admin/users')
+        setUsers(data?.users || [])
+      } else if (tab === 'solicitudes') {
+        const data = await get('/admin/seller-applications')
+        setApplications(data?.applications || [])
+      } else if (tab === 'reportes') {
+        const data = await get('/admin/reports/sales')
+        setReports(data || null)
+      }
+    } catch (err) {
+      setError(err.message || 'Error al cargar los datos')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function cambiarStatusVendedor(id, nuevoStatus) {
-    setVendedores(prev => prev.map(v => v.id === id ? { ...v, status: nuevoStatus } : v))
-    setExpandido(null)
+  async function handleSuspendUser(id, is_active) {
+    if (!window.confirm(`¿Estás seguro de ${is_active ? 'suspender' : 'activar'} a este usuario?`)) return
+    try {
+      await patch(`/admin/users/${id}/suspend`, { is_active: !is_active })
+      fetchData()
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
-  function quitarProducto(id) {
-    setProductos(prev => prev.filter(p => p.id !== id))
-    setExpandido(null)
+  async function handleDeleteUser(id) {
+    if (!window.confirm('¿Estás seguro de ELIMINAR definitivamente a este usuario?')) return
+    try {
+      await del(`/admin/users/${id}`)
+      fetchData()
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
-  function resolverReporte(id) {
-    setReportes(prev => prev.map(r => r.id === id ? { ...r, status: 'resuelto' } : r))
+  async function handleChangeRole(id, currentRole) {
+    const newRole = window.prompt('Escribe el nuevo rol (cliente, vendedor, admin):', currentRole)
+    if (!newRole || newRole === currentRole) return
+    try {
+      await patch(`/admin/users/${id}/role`, { role: newRole })
+      fetchData()
+    } catch (err) {
+      alert(err.message)
+    }
   }
+
+  async function handleApproveApp(id) {
+    if (!window.confirm('¿Aprobar solicitud? El usuario se convertirá en vendedor.')) return
+    try {
+      await post(`/admin/seller-applications/${id}/approve`)
+      fetchData()
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  async function handleRejectApp(id) {
+    const reason = window.prompt('Motivo de rechazo:')
+    if (reason === null) return
+    try {
+      await post(`/admin/seller-applications/${id}/reject`, { reason })
+      fetchData()
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  const pendientesCount = applications.length
 
   return (
     <div>
-      {/* Hero */}
       <div className="admin-hero">
-        <h1>Panel de control</h1>
+        <h1>Panel de Administración</h1>
       </div>
 
-      {/* Tabs */}
       <div className="admin-tabs">
-        <button className={`admin-tab ${tab === 'vendedores' ? 'activo' : ''}`} onClick={() => navigate('/admin/vendedores')}>
-          <Users size={14} /> Vendedores
-          {pendientesVendedores > 0 && <span className="admin-badge">{pendientesVendedores}</span>}
+        <button className={`admin-tab ${tab === 'usuarios' ? 'activo' : ''}`} onClick={() => navigate('/admin/usuarios')}>
+          <Users size={14} /> Usuarios
         </button>
-        <button className={`admin-tab ${tab === 'productos' ? 'activo' : ''}`} onClick={() => navigate('/admin/productos')}>
-          <ShoppingBag size={14} /> Productos
+        <button className={`admin-tab ${tab === 'solicitudes' ? 'activo' : ''}`} onClick={() => navigate('/admin/solicitudes')}>
+          <Shield size={14} /> Solicitudes
+          {pendientesCount > 0 && <span className="admin-badge">{pendientesCount}</span>}
         </button>
         <button className={`admin-tab ${tab === 'reportes' ? 'activo' : ''}`} onClick={() => navigate('/admin/reportes')}>
-          <Flag size={14} /> Reportes
-          {pendientesReportes > 0 && <span className="admin-badge">{pendientesReportes}</span>}
+          <Activity size={14} /> Reportes
         </button>
       </div>
 
       <div className="admin-body">
+        {loading && <p>Cargando información...</p>}
+        {error && <p style={{color: 'red'}}>{error}</p>}
 
-        {/* ── Vendedores ── */}
-        {tab === 'vendedores' && (
-          <div>
-            {vendedores.map(v => (
-              <div key={v.id} className="admin-card">
-                <div className="admin-card-header" onClick={() => toggleExpandido(v.id)}>
-                  <div>
-                    <div className="admin-card-meta">
-                      <span className={`status-badge ${statusVendedor[v.status].clase}`}>
-                        {v.status === 'pendiente' && <Clock size={10} />}
-                        {v.status === 'aprobado'  && <CheckCircle size={10} />}
-                        {v.status === 'rechazado' && <XCircle size={10} />}
-                        {statusVendedor[v.status].label}
-                      </span>
-                      <span className="admin-card-fecha">{v.fecha}</span>
+        {!loading && !error && (
+          <>
+            {tab === 'usuarios' && (
+              <div>
+                {users.map(u => (
+                  <div key={u.id} className="admin-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px' }}>
+                      <div>
+                        <h3>{u.full_name} <span style={{fontSize: '0.8em', color: '#666'}}>({u.role})</span></h3>
+                        <p>{u.email}</p>
+                        <span className={`status-badge ${u.is_active ? 'status-aprobado' : 'status-rechazado'}`}>
+                          {u.is_active ? 'Activo' : 'Suspendido'}
+                        </span>
+                      </div>
+                      <div className="admin-acciones-grid" style={{ gridTemplateColumns: '1fr', gap: '8px' }}>
+                        <button className="admin-btn admin-btn-nota" onClick={() => handleChangeRole(u.id, u.role)}>
+                          Cambiar Rol
+                        </button>
+                        <button className="admin-btn admin-btn-suspender" onClick={() => handleSuspendUser(u.id, u.is_active)}>
+                          {u.is_active ? 'Suspender' : 'Activar'}
+                        </button>
+                        <button className="admin-btn admin-btn-rechazar" onClick={() => handleDeleteUser(u.id)}>
+                          <Trash2 size={15} /> Borrar
+                        </button>
+                      </div>
                     </div>
-                    <h3>{v.nombre}</h3>
-                    <p>{v.contacto}</p>
                   </div>
-                  {expandido === v.id ? <ChevronUp size={16} color="#9ca3af" /> : <ChevronDown size={16} color="#9ca3af" />}
+                ))}
+                {users.length === 0 && <p>No hay usuarios registrados.</p>}
+              </div>
+            )}
+
+            {tab === 'solicitudes' && (
+              <div>
+                {applications.map(app => (
+                  <div key={app.id} className="admin-card">
+                    <div style={{ padding: '16px' }}>
+                      <h3>{app.requested_display_name} <span style={{fontSize: '0.8em', color: '#666'}}>({app.seller_type})</span></h3>
+                      <p><strong>Descripción:</strong> {app.description}</p>
+                      <p><strong>Teléfono:</strong> {app.contact_phone}</p>
+                      <div className="admin-acciones-grid" style={{ marginTop: '16px' }}>
+                        <button className="admin-btn admin-btn-aprobar" onClick={() => handleApproveApp(app.id)}>
+                          <CheckCircle size={15} /> Aprobar
+                        </button>
+                        <button className="admin-btn admin-btn-rechazar" onClick={() => handleRejectApp(app.id)}>
+                          <XCircle size={15} /> Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {applications.length === 0 && <p>No hay solicitudes pendientes.</p>}
+              </div>
+            )}
+
+            {tab === 'reportes' && reports && (
+              <div>
+                <div className="admin-card" style={{ padding: '24px', textAlign: 'center', marginBottom: '24px' }}>
+                  <BarChart size={48} color="var(--color-accent)" style={{ marginBottom: '16px' }} />
+                  <h2>Total de Ventas Históricas</h2>
+                  <p style={{ fontSize: '2em', fontWeight: 'bold', color: 'var(--color-accent)' }}>
+                    ${(reports.total_sales_cents / 100).toFixed(2)} MXN
+                  </p>
                 </div>
-
-                {expandido === v.id && (
-                  <div className="admin-card-detalle">
-                    <div className="admin-detalle-fila">
-                      <span>Email</span><span>{v.email}</span>
-                    </div>
-                    <div className="admin-detalle-fila">
-                      <span>Teléfono</span><span>{v.telefono}</span>
-                    </div>
-                    <div className="admin-detalle-fila">
-                      <span>RFC</span><span>{v.rfc}</span>
-                    </div>
-                    <p className="admin-detalle-desc">{v.descripcion}</p>
-                    <div className="admin-acciones-grid">
-                      <button className="admin-btn admin-btn-aprobar" onClick={() => cambiarStatusVendedor(v.id, 'aprobado')}>
-                        <CheckCircle size={15} /> Aprobar
-                      </button>
-                      <button className="admin-btn admin-btn-rechazar" onClick={() => cambiarStatusVendedor(v.id, 'rechazado')}>
-                        <XCircle size={15} /> Rechazar
-                      </button>
-                      <button className="admin-btn admin-btn-suspender">
-                        <PauseCircle size={15} /> Suspender
-                      </button>
-                      <button className="admin-btn admin-btn-nota">
-                        <MessageSquare size={15} /> Enviar nota
-                      </button>
+                
+                <h3>Últimos Pedidos</h3>
+                {reports.recent_orders?.map(order => (
+                  <div key={order.id} className="admin-card" style={{ padding: '16px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div>
+                        <strong>{order.order_number}</strong>
+                        <p>{order.buyer_name}</p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span className="status-badge status-aprobado">{order.status}</span>
+                        <p style={{ fontWeight: 'bold', marginTop: '8px' }}>${(order.total_cents / 100).toFixed(2)}</p>
+                      </div>
                     </div>
                   </div>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
-
-        {/* ── Productos ── */}
-        {tab === 'productos' && (
-          <div>
-            {productos.map(p => (
-              <div key={p.id} className="admin-card">
-                <div className="admin-card-header" onClick={() => toggleExpandido(p.id)}>
-                  <div className="admin-producto-fila">
-                    <img src={p.imagen} alt={p.nombre} className="admin-producto-img" />
-                    <div>
-                      <h3>{p.nombre}</h3>
-                      <p>{p.vendedor}</p>
-                      <span className="status-badge status-aprobado">
-                        <CheckCircle size={10} /> Activo
-                      </span>
-                    </div>
-                  </div>
-                  {expandido === p.id ? <ChevronUp size={16} color="#9ca3af" /> : <ChevronDown size={16} color="#9ca3af" />}
-                </div>
-
-                {expandido === p.id && (
-                  <div className="admin-card-detalle">
-                    <p className="admin-detalle-desc">{p.descripcion}</p>
-                    <p style={{ fontSize: '13px', color: 'var(--color-accent)', fontWeight: '600', marginBottom: '16px' }}>
-                      Precio: ${p.precio}
-                    </p>
-                    <div className="admin-acciones-grid admin-acciones-3">
-                      <button className="admin-btn admin-btn-rechazar" onClick={() => quitarProducto(p.id)}>
-                        <Trash2 size={15} /> Quitar
-                      </button>
-                      <button className="admin-btn admin-btn-suspender">
-                        <PauseCircle size={15} /> Suspender
-                      </button>
-                      <button className="admin-btn admin-btn-nota">
-                        <MessageSquare size={15} /> Nota
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── Reportes ── */}
-        {tab === 'reportes' && (
-          <div>
-            <div className="admin-reportes-titulo">
-              <Flag size={16} />
-              Reportes de usuarios
-              {pendientesReportes > 0 && (
-                <span className="admin-badge-pendientes">{pendientesReportes} pendientes</span>
-              )}
-            </div>
-
-            {reportes.map(r => (
-              <div key={r.id} className={`admin-reporte-card ${r.status === 'resuelto' ? 'resuelto' : ''}`}>
-                <div className="admin-reporte-header">
-                  <div className="admin-reporte-meta">
-                    <span className="admin-reporte-tipo">{r.tipo}</span>
-                    <span className="admin-card-fecha">{r.fecha}</span>
-                  </div>
-                  <span className={`status-badge ${r.status === 'resuelto' ? 'status-resuelto' : 'status-pendiente'}`}>
-                    {r.status === 'resuelto' ? 'Resuelto' : 'Pendiente'}
-                  </span>
-                </div>
-                <h3 className="admin-reporte-nombre">{r.nombre}</h3>
-                <p className="admin-reporte-motivo">Motivo: {r.motivo}</p>
-                <p className="admin-reporte-desc">{r.descripcion}</p>
-                {r.status === 'pendiente' && (
-                  <button className="admin-btn-resolver" onClick={() => resolverReporte(r.id)}>
-                    <CheckCircle size={14} /> Marcar resuelto
-                  </button>
-                )}
-              </div>
-            ))}
-
-            <div className="admin-historial">
-              <div className="admin-historial-titulo">
-                <Clock size={14} /> Historial de acciones
-              </div>
-              <div className="admin-historial-vacio">
-                Sin acciones registradas aún
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
     </div>
   )

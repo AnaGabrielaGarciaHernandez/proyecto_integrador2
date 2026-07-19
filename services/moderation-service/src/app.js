@@ -7,6 +7,8 @@ const {
   errorHandler,
 } = require('@ecobazar/platform');
 
+const adminController = require('./controllers/admin');
+
 function createApp({ db }) {
   const app = express();
   app.use(correlationMiddleware('moderation-service'));
@@ -24,7 +26,19 @@ function createApp({ db }) {
   });
 
   app.use('/api/reviews', requireUser, pending('Review'));
-  app.use('/api/admin', requireUser, requireAdmin, pending('Admin'));
+  const adminRouter = express.Router();
+  adminRouter.get('/users', adminController.getUsers);
+  adminRouter.patch('/users/:id/suspend', adminController.suspendUser);
+  adminRouter.delete('/users/:id', adminController.deleteUser);
+  adminRouter.patch('/users/:id/role', adminController.changeRole);
+
+  adminRouter.get('/seller-applications', adminController.getApplications);
+  adminRouter.post('/seller-applications/:id/approve', adminController.approveApplication);
+  adminRouter.post('/seller-applications/:id/reject', adminController.rejectApplication);
+
+  adminRouter.get('/reports/sales', adminController.getSalesReports);
+
+  app.use('/api/admin', requireUser, requireAdmin, adminRouter);
   app.use(notFound);
   app.use(errorHandler);
   return app;

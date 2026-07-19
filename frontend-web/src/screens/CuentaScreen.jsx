@@ -107,24 +107,24 @@ export default function CuentaScreen() {
           <>
             <p className="cuenta-seccion-titulo">Panel de control</p>
             <div className="cuenta-opciones">
-              <button className="cuenta-opcion" onClick={() => navigate('/admin/vendedores')}>
+              <button className="cuenta-opcion" onClick={() => navigate('/admin/usuarios')}>
                 <div className="cuenta-opcion-icono" style={{ background: '#dcfce7' }}>
                   <Users size={20} color="#16a34a" />
                 </div>
                 <div className="cuenta-opcion-texto">
-                  <h3>Gestionar vendedores</h3>
-                  <p>Solicitudes y perfiles de vendedores</p>
+                  <h3>Gestionar usuarios</h3>
+                  <p>Ver, suspender y eliminar cuentas</p>
                 </div>
                 <ChevronRight size={16} className="cuenta-opcion-arrow" />
               </button>
 
-              <button className="cuenta-opcion" onClick={() => navigate('/admin/productos')}>
+              <button className="cuenta-opcion" onClick={() => navigate('/admin/solicitudes')}>
                 <div className="cuenta-opcion-icono" style={{ background: '#dbeafe' }}>
                   <ShoppingBag size={20} color="#3b82f6" />
                 </div>
                 <div className="cuenta-opcion-texto">
-                  <h3>Gestionar productos</h3>
-                  <p>Todo lo que se vende en EcoBazar</p>
+                  <h3>Solicitudes</h3>
+                  <p>Aprobar o rechazar vendedores</p>
                 </div>
                 <ChevronRight size={16} className="cuenta-opcion-arrow" />
               </button>

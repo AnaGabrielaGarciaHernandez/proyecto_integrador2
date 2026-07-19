@@ -1,5 +1,6 @@
 import { Navigate, Routes, Route } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
+import AdminRoute from '../components/AdminRoute'
 
 import HomeScreen     from '../screens/HomeScreen'
 import ExplorarScreen from '../screens/ExplorarScreen'
@@ -33,9 +34,11 @@ export default function AppRouter() {
         <Route path="/registro"     element={<RegistroScreen />} />
         <Route path="/vender"       element={<VenderScreen />} />
         <Route path="/soporte"      element={<AtencionClienteScreen />} />
-        <Route path="/admin/vendedores" element={<AdminScreen />} />
-        <Route path="/admin/productos"  element={<AdminScreen />} />
-        <Route path="/admin/reportes"   element={<AdminScreen />} />
+        <Route element={<AdminRoute />}>
+          <Route path="/admin/usuarios"    element={<AdminScreen />} />
+          <Route path="/admin/solicitudes" element={<AdminScreen />} />
+          <Route path="/admin/reportes"    element={<AdminScreen />} />
+        </Route>
       </Route>
     </Routes>
   )

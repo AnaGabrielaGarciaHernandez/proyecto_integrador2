@@ -146,7 +146,7 @@ export default function Sidebar({ abierto, onCerrar }) {
           {usuario?.role === 'admin' && (
             <>
               <NavLink
-                to="/admin/vendedores"
+                to="/admin/usuarios"
                 onClick={onCerrar}
                 className={({ isActive }) =>
                   isActive
@@ -155,11 +155,11 @@ export default function Sidebar({ abierto, onCerrar }) {
                 }
               >
                 <Users size={15} />
-                Gestionar vendedores
+                Gestionar usuarios
               </NavLink>
 
               <NavLink
-                to="/admin/productos"
+                to="/admin/solicitudes"
                 onClick={onCerrar}
                 className={({ isActive }) =>
                   isActive
@@ -168,7 +168,7 @@ export default function Sidebar({ abierto, onCerrar }) {
                 }
               >
                 <Package size={15} />
-                Gestionar productos
+                Solicitudes
               </NavLink>
 
               <NavLink

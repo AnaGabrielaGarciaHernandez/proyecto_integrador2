@@ -221,6 +221,18 @@ Cuenta de vendedor demo:
 
 Para comprar puedes registrar un usuario nuevo desde la aplicación.
 
+### Crear un Usuario Administrador
+
+El sistema ya cuenta con el panel de administración funcional, pero no existe una ruta pública para registrarse como administrador por motivos de seguridad. Para probar el panel, debes crear una cuenta normal desde la aplicación y luego ejecutar este comando en tu terminal para elevar sus permisos:
+
+En Windows (PowerShell) o macOS (Terminal):
+```text
+docker compose exec -T postgres sh -c "psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c \"UPDATE identity.users SET role = 'admin' WHERE email = 'tu_correo@example.com';\""
+```
+*(Recuerda sustituir `tu_correo@example.com` por el correo del usuario que creaste).*
+
+Después de ejecutarlo, si tienes la sesión abierta en el navegador, **cierra sesión y vuelve a entrar** para que se genere un nuevo token con tus privilegios actualizados.
+
 ## Configurar Stripe Sandbox En Windows O macOS
 
 Esta sección sólo es necesaria para probar `Ir a pagar`.
@@ -398,8 +410,8 @@ Empieza revisando PostgreSQL, RabbitMQ y el job de migraciones de schema `migrat
 
 - Recolección presencial gratuita.
 - Una sola cuenta Stripe cobra el pedido completo.
-- Los vendedores consultan ventas reales; la solicitud/publicación de productos permanece como prototipo fuera de alcance.
-- Admin y Reviews permanecen reservados para otra iteración.
+- El panel de Admin ya está integrado para administrar usuarios, reportes y solicitudes de nuevos vendedores.
+- Reviews permanece reservado para otra iteración.
 - Stripe Connect, payouts, refunds, devoluciones y programación de pickup están fuera de alcance.
 
 Consulta [DOCUMENTACION_TECNICA.md](DOCUMENTACION_TECNICA.md) antes de modificar la arquitectura, los contratos de eventos o la Saga de checkout.

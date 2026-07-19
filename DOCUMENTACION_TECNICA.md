@@ -15,7 +15,7 @@ EcoBazar se instala y opera exclusivamente con la arquitectura de microservicios
 - Frontend conectado exclusivamente al API Gateway.
 - Instalación reproducible mediante Docker Compose y migraciones de schema versionadas.
 
-Admin y Reviews continúan fuera de alcance y responden `501`. El contrato `moderation.seller_rating.changed.v1` y su consumidor en Catalog están preparados, pero Moderation no producirá ese evento hasta que Reviews tenga operaciones reales.
+Admin fue implementado en `moderation-service` (orquestador de administración de usuarios, solicitudes de vendedores y reportes). Reviews continúa fuera de alcance y responde `501`. El contrato `moderation.seller_rating.changed.v1` y su consumidor en Catalog están preparados, pero Moderation no producirá ese evento hasta que Reviews tenga operaciones reales.
 
 ## Objetivo Del Sistema
 
@@ -179,7 +179,7 @@ Las llamadas REST entre servicios requieren `x-internal-token` y usan comparaci�
 | `GET /api/seller/orders/:id` | Order | Vendedor/admin propietario | Detalle limitado a sus items |
 | `POST /api/stripe/webhook` | Payment | Firma Stripe | Fuente de verdad del pago |
 | `/api/reviews/*` | Moderation | Usuario | Reservado; actualmente `501` |
-| `/api/admin/*` | Moderation | Admin | Reservado; actualmente `501` |
+| `/api/admin/*` | Moderation | Admin | Panel de administración (usuarios, solicitudes, reportes) |
 | `GET /api/health` | Gateway | No | Readiness agregado |
 
 Los endpoints de autenticación que devuelven un usuario usan este DTO público:
@@ -252,11 +252,17 @@ Estas rutas no se publican al host y requieren el token de servicio:
 | Servicio | Ruta | Uso |
 |---|---|---|
 | Identity | `GET /internal/sessions/:id` | Introspección de una sesión desde Gateway |
+| Identity | `GET /internal/users` | Listar usuarios para el panel admin |
+| Identity | `PATCH /internal/users/:id/suspend` | Suspender cuenta de usuario |
+| Identity | `DELETE /internal/users/:id` | Eliminar cuenta de usuario |
 | Identity | `PATCH /internal/users/:id/role` | Cambio controlado de rol y emisión de evento |
 | Catalog | `POST /internal/variants/resolve` | Datos autoritativos para Cart |
 | Catalog | `POST /internal/reservations` | Reserva idempotente de inventario |
 | Catalog | `POST /internal/reservations/:orderId/release` | Liberación idempotente |
 | Catalog | `POST /internal/reservations/:orderId/confirm` | Confirmación después del pago |
+| Catalog | `GET /internal/seller-applications` | Solicitudes de vendedor pendientes |
+| Catalog | `PATCH /internal/seller-applications/:id/status` | Aprobar o rechazar solicitud de vendedor |
+| Order | `GET /internal/reports/sales` | Reporte consolidado de ventas pagadas y movimientos |
 | Cart | `GET /internal/carts/:buyerId/snapshot` | Snapshot usado por Order |
 | Payment | `POST /internal/checkout-sessions` | Crear o recuperar Checkout idempotentemente |
 | Payment | `POST /internal/checkout-sessions/:orderId/expire` | Expirar Checkout antes de compensar |
@@ -625,7 +631,7 @@ docker compose down -v
 - Pickup presencial y gratuito.
 - Una cuenta Stripe cobra el total.
 - Los vendedores consultan pedidos reales; las demás rutas de vendedor y el flujo de publicación permanecen como placeholders/prototipo.
-- Admin y Reviews conservan `501` hasta otra iteración.
+- El panel de Admin fue implementado con capacidades iniciales. Reviews conserva `501` hasta otra iteración.
 - El productor de rating en Moderation se habilitará junto con Reviews.
 - Stripe Connect, payouts, refunds y programación de pickup están fuera de alcance.
 - El timeout HTTP inicial de Order a Payment es de 5 segundos; una latencia Stripe mayor puede mostrar un `503` recuperable y reutilizar la sesión en el siguiente intento.

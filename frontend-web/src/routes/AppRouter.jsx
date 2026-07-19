@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Navigate, Routes, Route } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 
 import HomeScreen     from '../screens/HomeScreen'
@@ -10,7 +10,6 @@ import LoginScreen    from '../screens/LoginScreen'
 import RegistroScreen from '../screens/RegistroScreen'
 import VenderScreen   from '../screens/VenderScreen'
 import AdminScreen from '../screens/AdminScreen'
-import RecientesScreen from '../screens/RecientesScreen'
 import OrdersScreen from '../screens/OrdersScreen'
 import AtencionClienteScreen from '../screens/AtencionClienteScreen'
 import { CheckoutSuccessScreen, CheckoutCancelledScreen } from '../screens/CheckoutStatusScreen'
@@ -21,7 +20,7 @@ export default function AppRouter() {
       <Route element={<MainLayout />}>
         <Route path="/"             element={<HomeScreen />} />
         <Route path="/explorar"     element={<ExplorarScreen />} />
-        <Route path="/recientes"    element={<RecientesScreen />} />
+        <Route path="/recientes"    element={<Navigate to="/" replace />} />
         <Route path="/pedidos"      element={<OrdersScreen />} />
         <Route path="/carrito"      element={<CarritoScreen />} />
         <Route path="/checkout/exito" element={<CheckoutSuccessScreen />} />

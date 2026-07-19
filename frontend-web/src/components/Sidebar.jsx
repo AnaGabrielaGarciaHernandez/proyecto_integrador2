@@ -5,7 +5,6 @@ import {
   Grid2x2,
   ShoppingCart,
   User,
-  Sparkles,
   Tag,
   Headphones,
   LogOut,
@@ -135,19 +134,6 @@ export default function Sidebar({ abierto, onCerrar }) {
         <div className="sidebar-divider" />
 
         <nav className="sidebar-nav">
-
-          <NavLink
-            to="/recientes"
-            onClick={onCerrar}
-            className={({ isActive }) =>
-              isActive
-                ? 'nav-item nav-item-sm active'
-                : 'nav-item nav-item-sm'
-            }
-          >
-            <Sparkles size={15} />
-            Recién llegados
-          </NavLink>
 
           {usuario?.role === 'admin' && (
             <>

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 import {
-  getCarrito,
+  reconciliarCarrito,
   eliminarDelCarrito,
   cambiarCantidad,
 } from "../services/carrito";
@@ -26,66 +26,92 @@ export default function CarritoScreen() {
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");
+  const [ajustes, setAjustes] = useState([]);
+  const [itemProcesando, setItemProcesando] = useState(null);
+  const [cargaFallida, setCargaFallida] = useState(false);
+  const [reintento, setReintento] = useState(0);
 
   useEffect(() => {
     let mounted = true;
 
     if (authLoading || !user) return () => { mounted = false; };
 
-    const actualizar = async () => {
+    const cargarInicial = async () => {
       try {
+        setCargando(true);
         setError("");
-        const cart = await getCarrito();
+        setCargaFallida(false);
+        const cart = await reconciliarCarrito();
         if (!mounted) return;
-        setItems(cart.items);
-        setSubtotalCentavos(cart.subtotalCentavos);
-        setTotalCentavos(cart.totalCentavos);
+        aplicarCarrito(cart, true);
       } catch (err) {
         if (!mounted) return;
-        setError(err.message || "No se pudo cargar el carrito.");
-        setItems([]);
-        setSubtotalCentavos(0);
-        setTotalCentavos(0);
+        setError(err.message || "No se pudo verificar el stock del carrito.");
+        setCargaFallida(true);
       } finally {
         if (mounted) setCargando(false);
       }
     };
 
-    actualizar();
-
-    window.addEventListener("carritoActualizado", actualizar);
+    cargarInicial();
 
     return () => {
       mounted = false;
-      window.removeEventListener("carritoActualizado", actualizar);
     };
-  }, [authLoading, user]);
+  }, [authLoading, user, reintento]);
+
+  function aplicarCarrito(cart, incluirAjustes = false) {
+    setItems(cart.items);
+    setSubtotalCentavos(cart.subtotalCentavos);
+    setTotalCentavos(cart.totalCentavos);
+    if (incluirAjustes) setAjustes(cart.ajustes);
+  }
 
   async function handleEliminar(id) {
+    if (itemProcesando || procesando) return;
     try {
+      setItemProcesando(id);
+      setError("");
+      setAjustes([]);
       const cart = await eliminarDelCarrito(id);
-      setItems(cart.items);
-      setSubtotalCentavos(cart.subtotalCentavos);
-      setTotalCentavos(cart.totalCentavos);
+      aplicarCarrito(cart, true);
     } catch (err) {
       setError(err.message || "No se pudo eliminar el producto.");
+    } finally {
+      setItemProcesando(null);
     }
   }
 
   async function handleCantidad(item, delta) {
+    if (itemProcesando || procesando) return;
     const nextQuantity = Math.max(1, item.cantidad + delta);
+    if (nextQuantity === item.cantidad) return;
+
     try {
+      setItemProcesando(item.id);
+      setError("");
+      setAjustes([]);
       const cart = await cambiarCantidad(item.id, nextQuantity);
-      setItems(cart.items);
-      setSubtotalCentavos(cart.subtotalCentavos);
-      setTotalCentavos(cart.totalCentavos);
+      aplicarCarrito(cart, true);
     } catch (err) {
       setError(err.message || "No se pudo actualizar la cantidad.");
+      if (
+        err.details?.code === "STOCK_UNAVAILABLE"
+        || err.details?.code === "CART_ITEM_NOT_FOUND"
+      ) {
+        try {
+          aplicarCarrito(await reconciliarCarrito(), true);
+        } catch {
+          // Keep the original stock error visible.
+        }
+      }
+    } finally {
+      setItemProcesando(null);
     }
   }
 
   async function handlePagar() {
-    if (procesando) return;
+    if (procesando || itemProcesando) return;
     try {
       setProcesando(true);
       setError("");
@@ -94,11 +120,18 @@ export default function CarritoScreen() {
     } catch (err) {
       const messages = {
         CART_EMPTY: "Tu carrito está vacío.",
-        STOCK_UNAVAILABLE: "Uno de los productos ya no tiene stock suficiente.",
+        STOCK_UNAVAILABLE: "Cambió el stock disponible. Revisa las cantidades de tu carrito.",
         MIXED_CURRENCY: "Los productos del carrito usan monedas distintas.",
         CHECKOUT_IN_PROGRESS: "Ya hay un pago en proceso para esta cuenta.",
         STRIPE_UNAVAILABLE: "Los pagos no están disponibles por el momento.",
       };
+      if (err.details?.code === "STOCK_UNAVAILABLE") {
+        try {
+          aplicarCarrito(await reconciliarCarrito(), true);
+        } catch {
+          // Keep the checkout stock error visible.
+        }
+      }
       setError(messages[err.details?.code] || err.message || "No se pudo iniciar el pago.");
       setProcesando(false);
     }
@@ -107,6 +140,7 @@ export default function CarritoScreen() {
   const formatMoney = (cents) => new Intl.NumberFormat("es-MX", {
     style: "currency", currency: "MXN",
   }).format(cents / 100);
+  const controlesBloqueados = procesando || Boolean(itemProcesando);
 
   return (
     <div>
@@ -114,9 +148,15 @@ export default function CarritoScreen() {
         <h1>Mi carrito</h1>
 
         <p className="carrito-hero-sub">
-          {items.length === 0
-            ? "Vacío"
-            : `${items.length} prenda${items.length > 1 ? "s" : ""}`}
+          {!authLoading && !user
+            ? "Inicia sesión"
+            : cargando
+              ? "Verificando disponibilidad"
+              : cargaFallida
+                ? "No disponible"
+                : items.length === 0
+                  ? "Vacío"
+                  : `${items.length} prenda${items.length > 1 ? "s" : ""}`}
         </p>
       </div>
 
@@ -127,11 +167,32 @@ export default function CarritoScreen() {
           <Link to="/login" className="carrito-vacio-btn">Iniciar sesión</Link>
         </div>
       ) : <>
-      {error && <div className="login-error">{error}</div>}
+      {error && !cargaFallida && <div className="login-error" role="alert">{error}</div>}
+      {!cargando && !cargaFallida && ajustes.length > 0 && (
+        <div className="carrito-ajustes" role="status">
+          <strong>Actualizamos tu carrito</strong>
+          {ajustes.map((ajuste, index) => (
+            <span key={`${ajuste.itemId || ajuste.nombre}-${index}`}>
+              {formatAdjustment(ajuste)}
+            </span>
+          ))}
+        </div>
+      )}
 
       {cargando ? (
         <div className="carrito-vacio">
           <p>Cargando carrito...</p>
+        </div>
+      ) : cargaFallida ? (
+        <div className="carrito-vacio">
+          <p role="alert">{error || "No pudimos cargar tu carrito."}</p>
+          <button
+            type="button"
+            className="carrito-vacio-btn"
+            onClick={() => setReintento((revision) => revision + 1)}
+          >
+            Reintentar
+          </button>
         </div>
       ) : items.length === 0 ? (
         <div className="carrito-vacio">
@@ -177,6 +238,7 @@ export default function CarritoScreen() {
                     <button
                       className="carrito-btn-cantidad"
                       onClick={() => handleCantidad(item, -1)}
+                      disabled={item.cantidad <= 1 || controlesBloqueados}
                       aria-label={`Disminuir cantidad de ${item.nombre}`}
                     >
                       <Minus size={12} />
@@ -189,7 +251,7 @@ export default function CarritoScreen() {
                     <button
                       className="carrito-btn-cantidad"
                       onClick={() => handleCantidad(item, 1)}
-                      disabled={item.cantidad >= item.stock}
+                      disabled={item.cantidad >= item.stock || controlesBloqueados}
                       aria-label={`Aumentar cantidad de ${item.nombre}`}
                     >
                       <Plus size={12} />
@@ -198,15 +260,16 @@ export default function CarritoScreen() {
                     <button
                       className="carrito-btn-eliminar"
                       onClick={() => handleEliminar(item.id)}
+                      disabled={controlesBloqueados}
                       aria-label={`Eliminar ${item.nombre} del carrito`}
                     >
                       <Trash2 size={13} />
                     </button>
                   </div>
 
-                  {item.cantidad >= item.stock && (
+                  {item.stock > 0 && item.cantidad >= item.stock && (
                     <span className="carrito-stock-maximo">
-                      Stock máximo alcanzado
+                      Máximo disponible: {item.stock}
                     </span>
                   )}
                 </div>
@@ -231,7 +294,12 @@ export default function CarritoScreen() {
             </div>
           </div>
 
-          <button className="carrito-btn-pagar" onClick={handlePagar} disabled={procesando}>
+          <button
+            className="carrito-btn-pagar"
+            onClick={handlePagar}
+            disabled={controlesBloqueados}
+            aria-busy={procesando}
+          >
             {procesando ? "Preparando pago..." : "Ir a pagar"}
             <ArrowRight size={16} />
           </button>
@@ -240,4 +308,11 @@ export default function CarritoScreen() {
       </>}
     </div>
   );
+}
+
+function formatAdjustment(ajuste) {
+  if (ajuste.codigo === "CART_ITEM_REMOVED") {
+    return `Quitamos ${ajuste.nombre} porque ya no está disponible.`;
+  }
+  return `Reducimos ${ajuste.nombre} de ${ajuste.cantidadAnterior} a ${ajuste.cantidadNueva} unidades por disponibilidad.`;
 }

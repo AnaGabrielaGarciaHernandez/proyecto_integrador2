@@ -13,21 +13,32 @@ export async function getProducts(params = {}) {
 
   const suffix = query.toString() ? `?${query.toString()}` : ''
   const data = await get(`/products${suffix}`)
+  const products = (data.products || []).map(mapProduct)
   return {
-    products: (data.products || []).map(mapProduct),
+    products: products.filter((product) => product.availabilityStatus !== 'unavailable'),
     pagination: data.pagination,
   }
 }
 
 export async function getProduct(id) {
   const data = await get(`/products/${id}`)
-  return mapProduct(data.product)
+  const product = mapProduct(data.product)
+  if (product.availabilityStatus === 'unavailable') {
+    const error = new Error('Este producto ya no está disponible.')
+    error.status = 404
+    throw error
+  }
+  return product
 }
 
 function mapProduct(product) {
   const variants = product.variants || []
-  const firstAvailableVariant = variants.find((variant) => variant.stock > 0) || variants[0] || null
+  const firstAvailableVariant = variants.find((variant) => variant.stock > 0) || null
   const price = centsToPesos(product.price_cents)
+  const totalStock = Number(product.total_stock || 0)
+  const availabilityStatus = product.availability_status
+    || (totalStock > 0 ? 'available' : 'unavailable')
+  const temporarilyUnavailable = availabilityStatus === 'temporarily_unavailable'
 
   return {
     id: product.id,
@@ -40,7 +51,7 @@ function mapProduct(product) {
     vendedorTipo: product.bazaar ? 'Bazar' : 'Vendedor',
     seller: product.seller,
     bazaar: product.bazaar,
-    talla: firstAvailableVariant?.size_name || 'N/A',
+    talla: firstAvailableVariant?.size_name || variants[0]?.size_name || 'N/A',
     precio: price,
     precioOriginal: Math.round(price * 1.25),
     descuento: price > 0 ? 20 : 0,
@@ -50,8 +61,14 @@ function mapProduct(product) {
     imagenes: product.images || [],
     variants,
     varianteDisponible: firstAvailableVariant,
-    totalStock: product.total_stock || 0,
-    tipo: product.total_stock > 0 ? 'Disponible' : 'Sin stock',
+    totalStock,
+    availabilityStatus,
+    agotadoTemporalmente: temporarilyUnavailable,
+    tipo: temporarilyUnavailable
+      ? 'Sold out'
+      : availabilityStatus === 'available'
+        ? 'Disponible'
+        : null,
     entrega: 'Entrega presencial',
     direccion: product.bazaar?.name || 'Durango, Dgo.',
   }

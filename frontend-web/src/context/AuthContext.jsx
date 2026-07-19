@@ -21,6 +21,19 @@ export function AuthProvider({ children }) {
   }, [])
 
   useEffect(() => {
+    function handleExpiredSession() {
+      if (!userRef.current) return
+      commitSessionUser(null)
+      setLoading(false)
+      window.dispatchEvent(new Event('authActualizado'))
+      window.dispatchEvent(new Event('carritoActualizado'))
+    }
+
+    window.addEventListener('sesionExpirada', handleExpiredSession)
+    return () => window.removeEventListener('sesionExpirada', handleExpiredSession)
+  }, [commitSessionUser])
+
+  useEffect(() => {
     let mounted = true
     const sessionRevision = sessionRevisionRef.current
 

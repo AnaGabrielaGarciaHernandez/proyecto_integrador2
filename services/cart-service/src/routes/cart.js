@@ -5,6 +5,7 @@ const {
   getCart,
   addItem,
   updateItem,
+  reconcileCart,
   deleteItem,
 } = require('../services/cart');
 
@@ -29,6 +30,14 @@ function createCartRouter({ db, catalogClient }) {
     }
   });
 
+  router.post('/reconcile', async (req, res, next) => {
+    try {
+      res.json(await reconcileCart(db, catalogClient, req.user.id, req.correlationId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post('/items', async (req, res, next) => {
     try {
       const input = parse(AddItemSchema, req.body, 'Invalid request body');
@@ -43,7 +52,7 @@ function createCartRouter({ db, catalogClient }) {
     try {
       const itemId = parse(UuidSchema, req.params.id, 'Invalid cart item id');
       const input = parse(UpdateItemSchema, req.body, 'Invalid request body');
-      const cart = await updateItem(
+      const result = await updateItem(
         db,
         catalogClient,
         req.user.id,
@@ -51,7 +60,7 @@ function createCartRouter({ db, catalogClient }) {
         input.quantity,
         req.correlationId,
       );
-      res.json({ cart });
+      res.json(result);
     } catch (error) {
       next(error);
     }

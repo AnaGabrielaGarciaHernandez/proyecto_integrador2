@@ -3,7 +3,14 @@ import { centsToPesos } from './products'
 
 export async function getCarrito() {
   const data = await get('/cart')
-  return mapCart(data.cart)
+  return mapCart(data.cart, data.adjustments)
+}
+
+export async function reconciliarCarrito() {
+  const data = await post('/cart/reconcile', {})
+  const cart = mapCart(data.cart, data.adjustments)
+  if (cart.ajustes.length > 0) notifyCartUpdated()
+  return cart
 }
 
 export async function agregarAlCarrito(variantId, quantity = 1) {
@@ -12,19 +19,19 @@ export async function agregarAlCarrito(variantId, quantity = 1) {
     quantity,
   })
   notifyCartUpdated()
-  return mapCart(data.cart)
+  return mapCart(data.cart, data.adjustments)
 }
 
 export async function eliminarDelCarrito(id) {
   const data = await del(`/cart/items/${id}`)
   notifyCartUpdated()
-  return mapCart(data.cart)
+  return mapCart(data.cart, data.adjustments)
 }
 
 export async function cambiarCantidad(id, quantity) {
   const data = await patch(`/cart/items/${id}`, { quantity })
   notifyCartUpdated()
-  return mapCart(data.cart)
+  return mapCart(data.cart, data.adjustments)
 }
 
 export async function contarItems() {
@@ -32,7 +39,7 @@ export async function contarItems() {
   return cart.items.reduce((total, item) => total + item.cantidad, 0)
 }
 
-function mapCart(cart) {
+function mapCart(cart, adjustments = []) {
   const items = (cart?.items || []).map((item) => ({
     id: item.id,
     variantId: item.variant_id,
@@ -54,6 +61,13 @@ function mapCart(cart) {
     subtotalCentavos: cart?.subtotal_cents || 0,
     totalCentavos: cart?.total_cents || 0,
     currency: cart?.currency || 'MXN',
+    ajustes: (adjustments || []).map((adjustment) => ({
+      codigo: adjustment.code,
+      itemId: adjustment.item_id,
+      nombre: adjustment.product_name,
+      cantidadAnterior: adjustment.previous_quantity,
+      cantidadNueva: adjustment.new_quantity,
+    })),
   }
 }
 

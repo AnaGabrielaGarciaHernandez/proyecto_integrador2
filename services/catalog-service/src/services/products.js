@@ -2,7 +2,11 @@ const { createHttpError } = require('@ecobazar/platform');
 
 async function listProducts(db, input) {
   const params = ['active'];
-  const where = ['p.status = $1'];
+  const where = [
+    'p.status = $1',
+    productSellerFilter(),
+    productAvailabilityFilter(),
+  ];
 
   if (input.q) {
     params.push(`%${input.q}%`);
@@ -35,14 +39,17 @@ async function listProducts(db, input) {
 async function getProduct(db, id) {
   const result = await db.query(
     `${productSelect({ detail: true })}
-     WHERE p.id = $1 AND p.status = 'active'`,
+     WHERE p.id = $1
+       AND p.status = 'active'
+       AND ${productSellerFilter()}
+       AND ${productAvailabilityFilter()}`,
     [id],
   );
   if (!result.rows[0]) throw createHttpError('Product not found', 404);
   return result.rows[0];
 }
 
-async function resolveVariants(db, variantIds) {
+async function resolveVariants(db, variantIds, buyerId = null) {
   if (variantIds.length === 0) return [];
   const result = await db.query(
     `SELECT
@@ -60,11 +67,22 @@ async function resolveVariants(db, variantIds) {
        sp.status AS seller_status,
        ur.role AS seller_role,
        ur.is_active AS seller_is_active,
+       COALESCE(buyer_reservation.reserved_quantity, 0)::integer
+         AS buyer_reserved_quantity,
        cover.cover_image
      FROM product_variants pv
      JOIN products p ON p.id = pv.product_id
      JOIN seller_profiles sp ON sp.id = p.seller_id
      JOIN user_role_projection ur ON ur.user_id = sp.user_id
+     LEFT JOIN LATERAL (
+       SELECT sum(reserved.quantity)::integer AS reserved_quantity
+       FROM inventory_reservation_items reserved
+       JOIN inventory_reservations reservation
+         ON reservation.order_id = reserved.order_id
+       WHERE reserved.variant_id = pv.id
+         AND reservation.buyer_id = $2::uuid
+         AND reservation.status = 'active'
+     ) buyer_reservation ON true
      LEFT JOIN LATERAL (
        SELECT json_build_object(
          'id', pi.id,
@@ -80,7 +98,7 @@ async function resolveVariants(db, variantIds) {
      ) cover ON true
      WHERE pv.id = ANY($1::uuid[])
      ORDER BY pv.id`,
-    [variantIds],
+    [variantIds, buyerId],
   );
   return result.rows;
 }
@@ -109,10 +127,17 @@ function productSelect({ detail = false } = {}) {
     ) END AS bazaar,
     COALESCE(variants.variants, '[]'::json) AS variants,
     COALESCE(images.images, '[]'::json) AS images,
-    COALESCE(variants.total_stock, 0)::integer AS total_stock
+    COALESCE(variants.total_stock, 0)::integer AS total_stock,
+    CASE
+      WHEN COALESCE(variants.total_stock, 0) > 0 THEN 'available'
+      WHEN COALESCE(active_reservation.has_active_reservation, false)
+        THEN 'temporarily_unavailable'
+      ELSE 'unavailable'
+    END AS availability_status
   FROM products p
   JOIN categories c ON c.id = p.category_id
   JOIN seller_profiles sp ON sp.id = p.seller_id
+  JOIN user_role_projection ur ON ur.user_id = sp.user_id
   LEFT JOIN bazaars b ON b.id = p.bazaar_id
   LEFT JOIN LATERAL (
     SELECT
@@ -124,6 +149,15 @@ function productSelect({ detail = false } = {}) {
     FROM product_variants pv
     WHERE pv.product_id = p.id
   ) variants ON true
+  LEFT JOIN LATERAL (
+    SELECT true AS has_active_reservation
+    FROM inventory_reservation_items reserved
+    JOIN inventory_reservations reservation
+      ON reservation.order_id = reserved.order_id
+    WHERE reserved.product_id = p.id
+      AND reservation.status = 'active'
+    LIMIT 1
+  ) active_reservation ON true
   LEFT JOIN LATERAL (
     SELECT json_agg(
       json_build_object(
@@ -139,6 +173,21 @@ function productSelect({ detail = false } = {}) {
     JOIN files f ON f.id = pi.file_id
     WHERE pi.product_id = p.id
   ) images ON true`;
+}
+
+function productAvailabilityFilter() {
+  return `(
+    COALESCE(variants.total_stock, 0) > 0
+    OR COALESCE(active_reservation.has_active_reservation, false)
+  )`;
+}
+
+function productSellerFilter() {
+  return `(
+    sp.status = 'approved'
+    AND ur.role = 'vendedor'
+    AND ur.is_active IS TRUE
+  )`;
 }
 
 module.exports = { listProducts, getProduct, resolveVariants };

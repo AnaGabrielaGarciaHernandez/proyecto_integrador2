@@ -39,10 +39,16 @@ export default function ProductoScreen() {
       .then((product) => {
         if (!mounted) return
         setProducto(product)
-        setVarianteId(product.varianteDisponible?.id || '')
+        setVarianteId(product.varianteDisponible?.id || product.variants[0]?.id || '')
       })
       .catch((err) => {
-        if (mounted) setError(err.message || 'Producto no encontrado.')
+        if (mounted) {
+          setError(
+            err.status === 404
+              ? 'Este producto ya no está disponible.'
+              : err.message || 'Producto no encontrado.',
+          )
+        }
       })
       .finally(() => {
         if (mounted) setCargando(false)
@@ -79,6 +85,7 @@ export default function ProductoScreen() {
 
     try {
       setAgregando(true)
+      setError('')
       await agregarAlCarrito(varianteId)
       setToast(true)
 
@@ -86,19 +93,46 @@ export default function ProductoScreen() {
         setToast(false)
       }, 2200)
     } catch (err) {
-      setError(err.message || 'No se pudo agregar al carrito.')
+      const productUnavailable = err.details?.code === 'PRODUCT_UNAVAILABLE' || err.status === 404
+      setError(
+        productUnavailable
+          ? 'Este producto ya no está disponible.'
+          : err.message || 'No se pudo agregar al carrito.',
+      )
+      if (
+        err.details?.code === 'STOCK_UNAVAILABLE'
+        || err.details?.code === 'PRODUCT_UNAVAILABLE'
+        || err.status === 404
+      ) {
+        await refreshProduct()
+      }
     } finally {
       setAgregando(false)
     }
   }
 
+  async function refreshProduct() {
+    try {
+      const current = await getProduct(id)
+      setProducto(current)
+      setVarianteId(current.varianteDisponible?.id || current.variants[0]?.id || '')
+    } catch (err) {
+      if (err.status === 404) {
+        setProducto(null)
+        setError('Este producto ya no está disponible.')
+      }
+    }
+  }
+
   const varianteSeleccionada = producto.variants.find((variant) => variant.id === varianteId)
+  const soldOut = producto.availabilityStatus === 'temporarily_unavailable'
+    || producto.totalStock <= 0
 
   return (
     <div className="producto-contenedor">
 
       {toast && (
-        <div className="toast-carrito">
+        <div className="toast-carrito" role="status" aria-live="polite" aria-atomic="true">
           <ShoppingCart size={16} />
           Agregado: {producto.nombre}
         </div>
@@ -160,7 +194,9 @@ export default function ProductoScreen() {
 
           {producto.tipo && (
             <span
-              className={`badge-tipo badge-tipo--${producto.tipo.toLowerCase()}`}
+              className={`badge-tipo ${
+                soldOut ? 'badge-tipo--sold-out' : 'badge-tipo--available'
+              }`}
             >
               {producto.tipo}
             </span>
@@ -197,6 +233,8 @@ export default function ProductoScreen() {
                 className="producto-talla-valor"
                 value={varianteId}
                 onChange={(e) => setVarianteId(e.target.value)}
+                disabled={soldOut}
+                aria-label="Talla"
               >
                 {producto.variants.map((variant) => (
                   <option
@@ -300,15 +338,20 @@ export default function ProductoScreen() {
 
         </div>
 
-        {error && <div className="login-error">{error}</div>}
+        {error && <div className="login-error" role="alert">{error}</div>}
 
         <button
           className="producto-btn-fijo"
           onClick={handleAgregar}
-          disabled={agregando || !varianteSeleccionada || varianteSeleccionada.stock <= 0}
+          disabled={agregando || soldOut || !varianteSeleccionada || varianteSeleccionada.stock <= 0}
+          aria-busy={agregando}
         >
           <ShoppingCart size={20} />
-          {agregando ? 'Agregando...' : `Agregar al carrito • $${producto.precio}`}
+          {soldOut
+            ? 'Agotado temporalmente'
+            : agregando
+              ? 'Agregando...'
+              : `Agregar al carrito • $${producto.precio}`}
         </button>
 
       </div>

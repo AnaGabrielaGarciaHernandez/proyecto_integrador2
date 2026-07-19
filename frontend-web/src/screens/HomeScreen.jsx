@@ -76,7 +76,7 @@ function Hero() {
   )
 }
 
-function Carrusel({ productos, onAgregar }) {
+function Carrusel({ productos, onAgregar, onError }) {
   return (
     <div className="carrusel-wrapper">
       <div className="carrusel">
@@ -85,6 +85,7 @@ function Carrusel({ productos, onAgregar }) {
             key={p.id}
             producto={p}
             onAgregar={onAgregar}
+            onError={onError}
           />
         ))}
       </div>
@@ -121,12 +122,34 @@ export default function HomeScreen() {
     }
   }, [])
 
-  function handleAgregar(nombre) {
-    setToast(nombre)
+  function handleAgregar(producto) {
+    setError('')
+    setToast(producto.nombre)
 
     setTimeout(() => {
       setToast(null)
     }, 2500)
+  }
+
+  async function handleAgregarError(err) {
+    const productUnavailable = err.details?.code === 'PRODUCT_UNAVAILABLE' || err.status === 404
+    setError(
+      productUnavailable
+        ? 'Este producto ya no está disponible.'
+        : err.message || 'No se pudo agregar al carrito.',
+    )
+    if (
+      err.details?.code !== 'STOCK_UNAVAILABLE'
+      && err.details?.code !== 'PRODUCT_UNAVAILABLE'
+      && err.status !== 404
+    ) return
+
+    try {
+      const { products } = await getProducts({ limit: 12 })
+      setProductos(products)
+    } catch {
+      // Keep the actionable stock message already shown.
+    }
   }
 
   async function handleOcultarBanner() {
@@ -165,13 +188,13 @@ export default function HomeScreen() {
       <Hero />
 
       {toast && (
-        <div className="toast-carrito">
+        <div className="toast-carrito" role="status" aria-live="polite" aria-atomic="true">
           <ShoppingCart size={16} />
           Agregado: {toast}
         </div>
       )}
 
-      {error && <div className="login-error">{error}</div>}
+      {error && <div className="login-error" role="alert">{error}</div>}
 
       {cargando && (
         <div style={{ padding: '24px' }}>
@@ -198,6 +221,7 @@ export default function HomeScreen() {
         <Carrusel
           productos={productosRecientes}
           onAgregar={handleAgregar}
+          onError={handleAgregarError}
         />
       </div>
 
@@ -220,6 +244,7 @@ export default function HomeScreen() {
         <Carrusel
           productos={productosVistos}
           onAgregar={handleAgregar}
+          onError={handleAgregarError}
         />
       </div>
 

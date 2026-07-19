@@ -64,8 +64,10 @@
 }
 
 .producto-talla-valor {
-  width: 40px;
+  width: auto;
+  min-width: 120px;
   height: 40px;
+  padding: 0 10px;
   border-radius: 10px;
   border: 1.5px solid #d1d5db;
   display: flex;
@@ -264,6 +266,12 @@
 
 .producto-btn-fijo:hover {
   background: #1b4332;
+}
+
+.producto-btn-fijo:disabled,
+.producto-btn-fijo:disabled:hover {
+  background: #6b7280;
+  cursor: not-allowed;
 }
 
 /* Botón volver */

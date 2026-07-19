@@ -34,7 +34,10 @@ async function removePurchasedQuantities(client, payload) {
     quantities.set(item.variant_id, (quantities.get(item.variant_id) || 0) + item.quantity);
   }
 
-  for (const [variantId, quantity] of quantities) {
+  const orderedQuantities = [...quantities.entries()]
+    .sort(([leftVariantId], [rightVariantId]) => leftVariantId.localeCompare(rightVariantId));
+
+  for (const [variantId, quantity] of orderedQuantities) {
     await client.query(
       `DELETE FROM cart_items ci
        USING shopping_carts sc

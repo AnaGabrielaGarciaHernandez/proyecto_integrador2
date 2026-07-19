@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, ShoppingCart } from "lucide-react";
 import ProductCard from "../components/ProductCard";
-import { agregarAlCarrito } from "../services/carrito";
 import { getProducts } from "../services/products";
 import "../styles/ExplorarScreen.css";
 
@@ -20,6 +19,7 @@ export default function ExplorarScreen() {
   const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [toast, setToast] = useState(null);
 
   const [busqueda, setBusqueda] = useState("");
@@ -45,18 +45,33 @@ export default function ExplorarScreen() {
     };
   }, []);
 
-  async function handleAgregar(producto) {
+  function handleAgregar(producto) {
+    setActionError("");
+    setToast(producto.nombre);
+
+    setTimeout(() => {
+      setToast(null);
+    }, 2500);
+  }
+
+  async function handleAgregarError(err) {
+    const productUnavailable = err.details?.code === "PRODUCT_UNAVAILABLE" || err.status === 404;
+    setActionError(
+      productUnavailable
+        ? "Este producto ya no está disponible."
+        : err.message || "No se pudo agregar al carrito.",
+    );
+    if (
+      err.details?.code !== "STOCK_UNAVAILABLE"
+      && err.details?.code !== "PRODUCT_UNAVAILABLE"
+      && err.status !== 404
+    ) return;
+
     try {
-      setError("");
-      await agregarAlCarrito(producto.varianteDisponible.id);
-
-      setToast(producto.nombre);
-
-      setTimeout(() => {
-        setToast(null);
-      }, 2500);
-    } catch (err) {
-      setError(err.message || "No se pudo agregar al carrito.");
+      const { products } = await getProducts({ limit: 48 });
+      setProductos(products);
+    } catch {
+      // Keep the stock error visible if refresh also fails.
     }
   }
 
@@ -78,7 +93,7 @@ export default function ExplorarScreen() {
   return (
     <div className="explorar-container">
       {toast && (
-        <div className="toast-carrito">
+        <div className="toast-carrito" role="status" aria-live="polite" aria-atomic="true">
           <ShoppingCart size={16} /> Agregado: {toast}
         </div>
       )}
@@ -87,7 +102,7 @@ export default function ExplorarScreen() {
       <div className="explorar-header">
         <h1>Explorar</h1>
         <p className="explorar-header-sub">
-          {productosFiltrados.length} prendas disponibles
+          {productosFiltrados.length} prendas
         </p>
         <div className="explorar-search">
           <Search size={18} />
@@ -134,7 +149,10 @@ export default function ExplorarScreen() {
         {cargando && (
           <div className="explorar-loading">Cargando productos...</div>
         )}
-        {error && <div className="login-error">{error}</div>}
+        {error && <div className="login-error" role="alert">{error}</div>}
+        {actionError && (
+          <div className="login-error" role="alert">{actionError}</div>
+        )}
 
         {!cargando && !error && productosFiltrados.length === 0 && (
           <div className="explorar-vacio">No se encontraron productos.</div>
@@ -147,6 +165,7 @@ export default function ExplorarScreen() {
                 key={producto.id}
                 producto={producto}
                 onAgregar={handleAgregar}
+                onError={handleAgregarError}
               />
             ))}
           </div>

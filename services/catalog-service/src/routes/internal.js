@@ -11,6 +11,7 @@ const {
 
 const ResolveVariantsSchema = z.object({
   variant_ids: z.array(z.string().uuid()).min(1).max(100),
+  buyer_id: z.string().uuid().optional(),
 });
 
 function createInternalRouter({ db, internalToken }) {
@@ -21,7 +22,7 @@ function createInternalRouter({ db, internalToken }) {
     try {
       const input = parse(ResolveVariantsSchema, req.body);
       const ids = [...new Set(input.variant_ids)].sort();
-      res.json({ variants: await resolveVariants(db, ids) });
+      res.json({ variants: await resolveVariants(db, ids, input.buyer_id) });
     } catch (error) {
       next(error);
     }

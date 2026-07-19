@@ -1,4 +1,9 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
+const EXPECTED_UNAUTHENTICATED_PATHS = new Set([
+  '/auth/me',
+  '/auth/login',
+  '/auth/google',
+])
 
 class ApiError extends Error {
   constructor(message, status, details) {
@@ -9,15 +14,34 @@ class ApiError extends Error {
   }
 }
 
+const PUBLIC_ERROR_MESSAGES = {
+  STOCK_UNAVAILABLE: 'No hay suficientes unidades disponibles para completar esta acción.',
+  PRODUCT_UNAVAILABLE: 'Este producto ya no está disponible.',
+  CART_ITEM_NOT_FOUND: 'Este producto ya no está en tu carrito.',
+  AUTHENTICATION_REQUIRED: 'Tu sesión expiró. Inicia sesión de nuevo.',
+  FORBIDDEN: 'No tienes permiso para realizar esta acción.',
+  CATALOG_UNAVAILABLE: 'No pudimos verificar la disponibilidad. Inténtalo de nuevo.',
+  SERVICE_UNAVAILABLE: 'El servicio no está disponible por el momento.',
+  NETWORK_ERROR: 'No pudimos conectarnos con EcoBazar. Inténtalo de nuevo.',
+  INTERNAL_ERROR: 'Ocurrió un problema. Inténtalo de nuevo.',
+}
+
 async function request(path, options = {}) {
-  const response = await fetch(`${API_URL}${path}`, {
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-    ...options,
-  })
+  let response
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+      ...options,
+    })
+  } catch {
+    throw new ApiError(PUBLIC_ERROR_MESSAGES.NETWORK_ERROR, 0, {
+      code: 'NETWORK_ERROR',
+    })
+  }
 
   if (response.status === 204) {
     return null
@@ -26,14 +50,26 @@ async function request(path, options = {}) {
   const data = await response.json().catch(() => null)
 
   if (!response.ok) {
+    const details = data?.error?.details
+    if (response.status === 401 && !EXPECTED_UNAUTHENTICATED_PATHS.has(path)) {
+      window.dispatchEvent(new Event('sesionExpirada'))
+    }
     throw new ApiError(
-      data?.error?.message || 'Error de conexión con EcoBazar',
+      getPublicErrorMessage(response.status, data?.error?.message, details?.code),
       response.status,
-      data?.error?.details,
+      details,
     )
   }
 
   return data
+}
+
+function getPublicErrorMessage(status, remoteMessage, code) {
+  if (PUBLIC_ERROR_MESSAGES[code]) return PUBLIC_ERROR_MESSAGES[code]
+  if (status === 401) return PUBLIC_ERROR_MESSAGES.AUTHENTICATION_REQUIRED
+  if (status === 403) return PUBLIC_ERROR_MESSAGES.FORBIDDEN
+  if (status >= 500) return PUBLIC_ERROR_MESSAGES.INTERNAL_ERROR
+  return remoteMessage || 'Error de conexión con EcoBazar'
 }
 
 export function get(path) {

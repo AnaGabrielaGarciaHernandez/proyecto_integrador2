@@ -1,5 +1,15 @@
 const { randomUUID, timingSafeEqual } = require('node:crypto');
 
+const PUBLIC_SERVER_ERROR_CODES = new Set([
+  'CATALOG_UNAVAILABLE',
+  'CHECKOUT_IN_PROGRESS',
+  'DEPENDENCY_INVALID_RESPONSE',
+  'DEPENDENCY_UNAVAILABLE',
+  'INTERNAL_ERROR',
+  'SERVICE_UNAVAILABLE',
+  'STRIPE_UNAVAILABLE',
+]);
+
 function createHttpError(message, status = 500, details) {
   const error = new Error(message);
   error.status = status;
@@ -47,8 +57,17 @@ function errorHandler(error, req, res, next) {
   const status = error.status || error.statusCode || 500;
   if (status >= 500) {
     console.error(`[${req.serviceName || 'service'}] correlation_id=${req.correlationId || 'unknown'} step=request_failed`, error);
+    const code = isPublicErrorCode(error.details?.code)
+      ? error.details.code
+      : 'INTERNAL_ERROR';
+    return res.status(status).json({
+      error: {
+        message: 'Internal server error',
+        details: { code },
+      },
+    });
   }
-  res.status(status).json({ error: { message: error.message || 'Internal server error', details: error.details } });
+  return res.status(status).json({ error: { message: error.message || 'Internal server error', details: error.details } });
 }
 
 function safeEqual(a, b) {
@@ -59,6 +78,10 @@ function safeEqual(a, b) {
 
 function isUuid(value) {
   return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function isPublicErrorCode(value) {
+  return PUBLIC_SERVER_ERROR_CODES.has(value);
 }
 
 module.exports = {

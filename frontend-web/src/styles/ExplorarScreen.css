@@ -156,6 +156,11 @@
   gap: 20px;
 }
 
+.explorar-grid .product-card {
+  width: 100%;
+  min-width: 0;
+}
+
 /* ── Estados ── */
 .explorar-loading,
 .explorar-vacio {

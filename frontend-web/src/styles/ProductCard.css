@@ -1,4 +1,5 @@
 .product-card {
+  position: relative;
   background: #ffffff;
   border-radius: var(--radius-card);
   overflow: hidden;
@@ -10,6 +11,18 @@
   cursor: pointer;
   width: 220px;
   flex-shrink: 0;
+}
+
+.product-card-detail-link {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border-radius: inherit;
+}
+
+.product-card-detail-link:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: -3px;
 }
 
 .product-card:hover {
@@ -51,6 +64,19 @@
   font-size: 11px;
   font-weight: 600;
   color: #fff;
+}
+
+.badge-tipo--available {
+  background: #287a4b;
+}
+
+.badge-tipo--sold-out {
+  background: #b42318;
+  text-transform: uppercase;
+}
+
+.product-card--sold-out .card-imagen img {
+  filter: saturate(0.55);
 }
 
 /* ── Condición ── */
@@ -166,6 +192,13 @@
 
 .btn-carrito:hover {
   background: var(--color-accent);
+}
+
+.btn-carrito:disabled,
+.btn-carrito:disabled:hover {
+  background: #d1d5db;
+  color: #6b7280;
+  cursor: not-allowed;
 }
 
 .btn-carrito {

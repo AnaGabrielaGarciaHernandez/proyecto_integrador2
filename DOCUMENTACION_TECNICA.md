@@ -167,6 +167,7 @@ Las llamadas REST entre servicios requieren `x-internal-token` y usan comparaci�
 | `GET /api/products` | Catalog | No | Lista y filtros de productos activos |
 | `GET /api/products/:id` | Catalog | No | Detalle, variantes, imágenes y vendedor |
 | `GET /api/cart` | Cart | Usuario | Carrito autoritativo |
+| `POST /api/cart/reconcile` | Cart | Usuario | Ajusta cantidades contra el stock disponible y devuelve los cambios |
 | `POST /api/cart/items` | Cart | Usuario | Agrega una variante |
 | `PATCH /api/cart/items/:id` | Cart | Usuario | Cambia cantidad |
 | `DELETE /api/cart/items/:id` | Cart | Usuario | Elimina un item |
@@ -217,6 +218,30 @@ Los errores usan esta forma:
   }
 }
 ```
+
+Los errores `5xx` nunca publican mensajes o detalles internos. Conservan únicamente
+un código operacional seguro, cuando existe, o usan `INTERNAL_ERROR`. El detalle
+completo permanece en los logs del servicio asociado al `x-correlation-id`.
+La lista pública de códigos `5xx` es explícita; SQLSTATE, nombres de dependencias
+internas y códigos no reconocidos se convierten en `INTERNAL_ERROR`.
+
+Los productos públicos incluyen `availability_status`. Sus valores publicables son
+`available` y `temporarily_unavailable`. El segundo indica que una reserva de
+checkout activa agotó temporalmente el stock; el producto sigue visible sin permitir
+agregarlo al carrito. Un producto activo sin stock ni reserva activa se excluye del
+listado y del detalle.
+
+`POST /api/cart/reconcile` responde `{ "cart": ..., "adjustments": [...] }`. Los
+ajustes usan `CART_QUANTITY_ADJUSTED` cuando una cantidad baja al máximo disponible
+y `CART_ITEM_REMOVED` cuando una línea ya no tiene unidades disponibles.
+Agregar y modificar líneas también valida el stock actual. `PRODUCT_UNAVAILABLE`
+identifica de forma segura un producto retirado o inactivo. Como Cart y Catalog son
+servicios separados, una reserva concurrente puede invalidar una foto de stock
+después de responder; la reserva de checkout vuelve a validar de forma autoritativa
+y la interfaz concilia el carrito cuando detecta ese conflicto.
+Al conciliar, Catalog suma únicamente las unidades de una reserva activa del mismo
+comprador. Así, volver desde Stripe no elimina su propia mercancía reservada, mientras
+los demás compradores siguen recibiendo stock cero y `temporarily_unavailable`.
 
 Checkout puede devolver `CART_EMPTY`, `STOCK_UNAVAILABLE`, `MIXED_CURRENCY`, `CHECKOUT_IN_PROGRESS` o `STRIPE_UNAVAILABLE`.
 

@@ -1,12 +1,14 @@
+import { useState } from "react";
 import { ShoppingCart } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { agregarAlCarrito } from "../services/carrito";
 import { useAuth } from "../context/useAuth";
 import "../styles/ProductCard.css";
 
-export default function ProductCard({ producto, onAgregar }) {
+export default function ProductCard({ producto, onAgregar, onError }) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [agregando, setAgregando] = useState(false);
 
   const {
     id,
@@ -20,11 +22,9 @@ export default function ProductCard({ producto, onAgregar }) {
     tipo,
     varianteDisponible,
     totalStock,
+    availabilityStatus,
   } = producto;
-
-  function irAlProducto() {
-    navigate(`/producto/${id}`);
-  }
+  const soldOut = availabilityStatus === "temporarily_unavailable" || totalStock <= 0;
 
   async function handleAgregar(e) {
     e.preventDefault();
@@ -35,26 +35,39 @@ export default function ProductCard({ producto, onAgregar }) {
       return;
     }
 
-    if (!varianteDisponible?.id || totalStock <= 0) return;
+    if (!varianteDisponible?.id || soldOut || agregando) return;
 
     try {
+      setAgregando(true);
       await agregarAlCarrito(varianteDisponible.id);
-
-      // Solo avisa al Home para mostrar el toast
-      onAgregar?.(nombre);
+      onAgregar?.(producto);
     } catch (error) {
-      console.error(error);
+      onError?.(error, producto);
+    } finally {
+      setAgregando(false);
     }
   }
 
   return (
-    <div className="product-card" onClick={irAlProducto}>
+    <div
+      className={`product-card ${soldOut ? "product-card--sold-out" : ""}`}
+    >
+      <Link
+        to={`/producto/${id}`}
+        className="product-card-detail-link"
+        aria-label={`Ver detalles de ${nombre}`}
+      />
+
       <div className="card-imagen">
         <img src={imagen} alt={nombre} />
 
         <div className="card-badges-top">
           {tipo && (
-            <span className={`badge-tipo badge-tipo--${tipo.toLowerCase()}`}>
+            <span
+              className={`badge-tipo ${
+                soldOut ? "badge-tipo--sold-out" : "badge-tipo--available"
+              }`}
+            >
               {tipo}
             </span>
           )}
@@ -94,7 +107,10 @@ export default function ProductCard({ producto, onAgregar }) {
               type="button"
               className="btn-carrito"
               onClick={handleAgregar}
-              disabled={!varianteDisponible?.id || totalStock <= 0}
+              disabled={!varianteDisponible?.id || soldOut || agregando}
+              aria-label={soldOut ? `${nombre} agotado temporalmente` : `Agregar ${nombre} al carrito`}
+              aria-busy={agregando}
+              title={soldOut ? "Agotado temporalmente" : "Agregar al carrito"}
             >
               <ShoppingCart size={15} />
             </button>

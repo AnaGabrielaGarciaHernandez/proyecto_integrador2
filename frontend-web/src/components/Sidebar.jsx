@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import {
   Home,
@@ -8,7 +8,6 @@ import {
   Sparkles,
   Tag,
   Headphones,
-  HelpCircle,
   LogOut,
   Users,
   Package,
@@ -25,18 +24,23 @@ export default function Sidebar({ abierto, onCerrar }) {
   const { user: usuario, logout } = useAuth()
 
   const [itemsCarrito, setItemsCarrito] = useState(0)
+  const cartRequestRevision = useRef(0)
 
   useEffect(() => {
     async function actualizar() {
+      const requestRevision = cartRequestRevision.current + 1
+      cartRequestRevision.current = requestRevision
+
       if (!usuario) {
-        setItemsCarrito(0)
+        if (cartRequestRevision.current === requestRevision) setItemsCarrito(0)
         return
       }
 
       try {
-        setItemsCarrito(await contarItems())
+        const count = await contarItems()
+        if (cartRequestRevision.current === requestRevision) setItemsCarrito(count)
       } catch {
-        setItemsCarrito(0)
+        if (cartRequestRevision.current === requestRevision) setItemsCarrito(0)
       }
     }
 
@@ -46,6 +50,7 @@ export default function Sidebar({ abierto, onCerrar }) {
     window.addEventListener('authActualizado', actualizar)
 
     return () => {
+      cartRequestRevision.current += 1
       window.removeEventListener('carritoActualizado', actualizar)
       window.removeEventListener('authActualizado', actualizar)
     }

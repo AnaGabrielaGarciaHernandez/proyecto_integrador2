@@ -23,19 +23,7 @@
   font-size: 22px;
   font-weight: 700;
   color: #ffffff;
-  margin-bottom: 8px;
-}
-
-.cuenta-rol-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255,255,255,0.1);
-  color: rgba(255,255,255,0.8);
-  padding: 4px 14px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
+  margin-bottom: 0;
 }
 
 .cuenta-body {

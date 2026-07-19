@@ -254,10 +254,6 @@ export default function Sidebar({ abierto, onCerrar }) {
                   <p className="sidebar-usuario-nombre">
                     {usuario.full_name}
                   </p>
-
-                  <p className="sidebar-usuario-rol">
-                    {usuario.role}
-                  </p>
                 </div>
 
               </div>

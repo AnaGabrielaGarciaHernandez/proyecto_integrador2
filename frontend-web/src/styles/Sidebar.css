@@ -178,12 +178,6 @@
   text-overflow: ellipsis;
 }
 
-.sidebar-usuario-rol {
-  font-size: 11px;
-  color: var(--color-sidebar-text);
-  text-transform: capitalize;
-}
-
 .btn-cerrar-sesion {
   display: flex;
   align-items: center;

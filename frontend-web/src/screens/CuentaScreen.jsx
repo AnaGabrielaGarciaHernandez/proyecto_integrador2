@@ -1,6 +1,6 @@
 import { useNavigate, Link } from 'react-router-dom'
 import {
-  Package, Heart, MapPin, CreditCard,
+  Package, Heart, MapPin,
   RefreshCw, LogOut, ChevronRight,
   Users, ShoppingBag, BarChart2, Tag, AlertCircle
 } from 'lucide-react'
@@ -28,18 +28,11 @@ export default function CuentaScreen() {
     )
   }
 
-  const rolLabel = {
-    cliente:  '🛍 Comprador',
-    vendedor: '🏷 Vendedor',
-    admin:    '⚙️ Administrador',
-  }
-
   return (
     <div>
       <div className="cuenta-hero">
         <div className="cuenta-avatar">🌿</div>
         <h1 className="cuenta-nombre">{usuario.full_name}</h1>
-        <span className="cuenta-rol-badge">{rolLabel[usuario.role] || usuario.role}</span>
       </div>
 
       <div className="cuenta-body">
@@ -76,17 +69,6 @@ export default function CuentaScreen() {
                 <div className="cuenta-opcion-texto">
                   <h3>Mis direcciones</h3>
                   <p>Gestiona tus puntos de entrega</p>
-                </div>
-                <ChevronRight size={16} className="cuenta-opcion-arrow" />
-              </button>
-
-              <button className="cuenta-opcion">
-                <div className="cuenta-opcion-icono" style={{ background: '#dbeafe' }}>
-                  <CreditCard size={20} color="#3b82f6" />
-                </div>
-                <div className="cuenta-opcion-texto">
-                  <h3>Métodos de pago</h3>
-                  <p>Tarjetas y métodos guardados</p>
                 </div>
                 <ChevronRight size={16} className="cuenta-opcion-arrow" />
               </button>

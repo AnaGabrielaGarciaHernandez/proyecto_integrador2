@@ -37,6 +37,18 @@ function createApp({ db, orders, checkoutService }) {
     }
   });
 
+  app.post('/api/checkout/active/cancel', requireUser, async (req, res, next) => {
+    try {
+      const order = await checkoutService.cancelActiveCheckout(
+        req.user.id,
+        req.correlationId,
+      );
+      res.json({ order });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post('/api/checkout/:orderId/cancel', requireUser, async (req, res, next) => {
     try {
       const orderId = ensureUuid(req.params.orderId);

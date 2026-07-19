@@ -18,6 +18,8 @@ const PUBLIC_ERROR_MESSAGES = {
   STOCK_UNAVAILABLE: 'No hay suficientes unidades disponibles para completar esta acción.',
   PRODUCT_UNAVAILABLE: 'Este producto ya no está disponible.',
   CART_ITEM_NOT_FOUND: 'Este producto ya no está en tu carrito.',
+  CHECKOUT_CART_CHANGED: 'Tu carrito cambió mientras preparábamos el pago. Inténtalo nuevamente.',
+  CHECKOUT_IN_PROGRESS: 'Tu pago sigue en proceso. Espera un momento e inténtalo nuevamente.',
   AUTHENTICATION_REQUIRED: 'Tu sesión expiró. Inicia sesión de nuevo.',
   FORBIDDEN: 'No tienes permiso para realizar esta acción.',
   CATALOG_UNAVAILABLE: 'No pudimos verificar la disponibilidad. Inténtalo de nuevo.',

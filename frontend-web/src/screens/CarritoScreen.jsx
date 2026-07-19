@@ -32,6 +32,19 @@ export default function CarritoScreen() {
   const [reintento, setReintento] = useState(0);
 
   useEffect(() => {
+    const handlePageShow = (event) => {
+      if (!event.persisted) return;
+      setProcesando(false);
+      setItemProcesando(null);
+      setCargando(true);
+      setReintento((revision) => revision + 1);
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
 
     if (authLoading || !user) return () => { mounted = false; };
@@ -122,6 +135,7 @@ export default function CarritoScreen() {
         CART_EMPTY: "Tu carrito está vacío.",
         STOCK_UNAVAILABLE: "Cambió el stock disponible. Revisa las cantidades de tu carrito.",
         MIXED_CURRENCY: "Los productos del carrito usan monedas distintas.",
+        CHECKOUT_CART_CHANGED: "Tu carrito cambió mientras preparábamos el pago. Inténtalo nuevamente.",
         CHECKOUT_IN_PROGRESS: "Ya hay un pago en proceso para esta cuenta.",
         STRIPE_UNAVAILABLE: "Los pagos no están disponibles por el momento.",
       };

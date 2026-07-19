@@ -1,4 +1,5 @@
 import { del, get, patch, post } from './api'
+import { cancelarCheckoutActivo } from './checkout'
 import { centsToPesos } from './products'
 
 export async function getCarrito() {
@@ -7,6 +8,7 @@ export async function getCarrito() {
 }
 
 export async function reconciliarCarrito() {
+  await cancelarCheckoutActivo()
   const data = await post('/cart/reconcile', {})
   const cart = mapCart(data.cart, data.adjustments)
   if (cart.ajustes.length > 0) notifyCartUpdated()
@@ -14,6 +16,7 @@ export async function reconciliarCarrito() {
 }
 
 export async function agregarAlCarrito(variantId, quantity = 1) {
+  await cancelarCheckoutActivo()
   const data = await post('/cart/items', {
     variant_id: variantId,
     quantity,
@@ -23,12 +26,14 @@ export async function agregarAlCarrito(variantId, quantity = 1) {
 }
 
 export async function eliminarDelCarrito(id) {
+  await cancelarCheckoutActivo()
   const data = await del(`/cart/items/${id}`)
   notifyCartUpdated()
   return mapCart(data.cart, data.adjustments)
 }
 
 export async function cambiarCantidad(id, quantity) {
+  await cancelarCheckoutActivo()
   const data = await patch(`/cart/items/${id}`, { quantity })
   notifyCartUpdated()
   return mapCart(data.cart, data.adjustments)

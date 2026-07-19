@@ -29,11 +29,8 @@ const paymentHttp = createServiceClient({
 const cartClient = {
   async getSnapshot(buyerId, correlationId) {
     const response = await cartHttp.request(`/internal/carts/${buyerId}/snapshot`, { correlationId });
-    if (!response.cart?.items?.length) {
-      throw createHttpError('The cart is empty', 409, { code: 'CART_EMPTY' });
-    }
     const contract = CartSnapshotSchema.safeParse(response.cart);
-    if (!contract.success) {
+    if (!contract.success || contract.data.buyer_id !== buyerId) {
       throw createHttpError('Cart snapshot violates the internal contract', 502, {
         code: 'DEPENDENCY_INVALID_RESPONSE', dependency: 'cart-service',
       });

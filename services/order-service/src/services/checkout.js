@@ -11,6 +11,7 @@ const {
 function createCheckoutService({ db, orders, cartClient, catalogClient, paymentClient }) {
   async function createCheckout(identity, correlationId) {
     let order = await orders.getPendingByBuyer(identity.id);
+    let cart = null;
     if (order?.saga_status === 'compensation_pending') {
       await compensate(order.id, {
         correlationId: order.correlation_id || correlationId,
@@ -20,9 +21,15 @@ function createCheckoutService({ db, orders, cartClient, catalogClient, paymentC
         code: 'CHECKOUT_IN_PROGRESS', order_id: order.id,
       });
     }
-    if (isReusableCheckout(order)) return formatCheckout(order);
+    if (isReusableCheckout(order)) {
+      cart = await loadCartSnapshot(identity.id, correlationId);
+      if (checkoutMatchesCart(order, cart)) return formatCheckout(order);
+      await retireCheckoutForReplacement(order, correlationId);
+      order = null;
+      cart = await loadCartSnapshot(identity.id, correlationId);
+    }
     if (!order) {
-      const cart = await cartClient.getSnapshot(identity.id, correlationId);
+      cart ||= await loadCartSnapshot(identity.id, correlationId);
       const result = await orders.createOrGetPending({
         buyerId: identity.id,
         buyerName: identity.name,
@@ -30,7 +37,12 @@ function createCheckoutService({ db, orders, cartClient, catalogClient, paymentC
         correlationId,
       });
       order = result.order;
-      if (isReusableCheckout(order)) return formatCheckout(order);
+      if (isReusableCheckout(order)) {
+        if (checkoutMatchesCart(order, cart)) return formatCheckout(order);
+        throw createHttpError('Checkout is being refreshed', 409, {
+          code: 'CHECKOUT_IN_PROGRESS', order_id: order.id,
+        });
+      }
     }
     // The saga correlation id is stable across HTTP retries. It is also embedded
     // in Stripe metadata, so keeping it stable preserves Stripe idempotency.
@@ -93,9 +105,18 @@ function createCheckoutService({ db, orders, cartClient, catalogClient, paymentC
         });
       }
       order = await orders.saveCheckout(order.id, response.checkout, flowCorrelationId);
+      const latestCart = await loadCartSnapshot(identity.id, correlationId);
+      if (!checkoutMatchesCart(order, latestCart)) {
+        await retireCheckoutForReplacement(order, correlationId);
+        throw createHttpError('Cart changed during checkout creation', 409, {
+          code: 'CHECKOUT_CART_CHANGED',
+        });
+      }
       return formatCheckout(order);
     } catch (error) {
-      if (error.details?.code === 'CHECKOUT_IN_PROGRESS') throw error;
+      if (['CHECKOUT_IN_PROGRESS', 'CHECKOUT_CART_CHANGED'].includes(error.details?.code)) {
+        throw error;
+      }
       if (error.details?.code === 'STRIPE_UNAVAILABLE') {
         // Payment only returns this business error after persisting a failed
         // creation. There is no usable Checkout Session, so stock can be
@@ -124,9 +145,14 @@ function createCheckoutService({ db, orders, cartClient, catalogClient, paymentC
     const order = await orders.getOwnedOrder(orderId, buyerId);
     if (order.status !== 'pending_payment') return orders.getBuyerOrder(orderId, buyerId);
 
-    const response = await paymentClient.expire(orderId, correlationId);
+    const response = await expireCheckoutSession(orderId, correlationId);
     if (response.payment?.status === 'succeeded' || response.checkout?.status === 'complete') {
       return orders.getBuyerOrder(orderId, buyerId);
+    }
+    if (!isConfirmedWithoutCharge(response)) {
+      throw createHttpError('Checkout state is still being confirmed', 409, {
+        code: 'CHECKOUT_IN_PROGRESS',
+      });
     }
     await compensate(orderId, {
       correlationId,
@@ -134,6 +160,59 @@ function createCheckoutService({ db, orders, cartClient, catalogClient, paymentC
       paymentStatus: 'cancelled',
     });
     return orders.getBuyerOrder(orderId, buyerId);
+  }
+
+  async function cancelActiveCheckout(buyerId, correlationId) {
+    const order = await orders.getPendingByBuyer(buyerId);
+    if (!order) return null;
+    if (order.saga_status !== 'payment_session_created' || !order.checkout_session_id) {
+      throw createHttpError('Checkout state is still being confirmed', 409, {
+        code: 'CHECKOUT_IN_PROGRESS',
+      });
+    }
+    return cancelCheckout(order.id, buyerId, correlationId);
+  }
+
+  async function loadCartSnapshot(buyerId, correlationId) {
+    const cart = await cartClient.getSnapshot(buyerId, correlationId);
+    if (cart?.buyer_id !== buyerId) {
+      throw createHttpError('Cart snapshot violates the internal contract', 502, {
+        code: 'DEPENDENCY_INVALID_RESPONSE', dependency: 'cart-service',
+      });
+    }
+    return cart;
+  }
+
+  async function retireCheckoutForReplacement(order, correlationId) {
+    const response = await expireCheckoutSession(order.id, correlationId);
+    if (response.payment?.status === 'succeeded' || response.checkout?.status === 'complete') {
+      throw createHttpError('This checkout is already being confirmed', 409, {
+        code: 'CHECKOUT_IN_PROGRESS', order_id: order.id,
+      });
+    }
+    if (!isConfirmedWithoutCharge(response)) {
+      throw createHttpError('Checkout state is still being confirmed', 503, {
+        code: 'CHECKOUT_IN_PROGRESS', order_id: order.id,
+      });
+    }
+    await compensate(order.id, {
+      correlationId,
+      reason: 'Cart changed after checkout creation',
+      paymentStatus: response.payment?.status === 'failed' ? 'failed' : 'cancelled',
+    });
+  }
+
+  async function expireCheckoutSession(orderId, correlationId) {
+    try {
+      return await paymentClient.expire(orderId, correlationId);
+    } catch (error) {
+      if (error.status === 404) {
+        throw createHttpError('Checkout state is still being confirmed', 409, {
+          code: 'CHECKOUT_IN_PROGRESS',
+        });
+      }
+      throw error;
+    }
   }
 
   async function compensate(orderId, {
@@ -192,7 +271,13 @@ function createCheckoutService({ db, orders, cartClient, catalogClient, paymentC
     console.log(`[order-service] correlation_id=${correlationId} event_type=${event.event_type} step=outbox_created order_id=${order.id}`);
   }
 
-  return { createCheckout, cancelCheckout, compensate, emitCancelled };
+  return {
+    createCheckout,
+    cancelCheckout,
+    cancelActiveCheckout,
+    compensate,
+    emitCancelled,
+  };
 }
 
 function isReusableCheckout(order) {
@@ -210,6 +295,42 @@ function formatCheckout(order) {
     url: order.checkout_url,
     expires_at: toIso(order.checkout_expires_at),
   };
+}
+
+function checkoutMatchesCart(order, cart) {
+  if (!cart || cart.buyer_id !== order.buyer_id) return false;
+  if (String(order.currency).toUpperCase() !== cartCurrency(cart)) return false;
+  const cartTotal = cart.items.reduce(
+    (total, item) => total + Number(item.quantity) * Number(item.unit_price_cents),
+    0,
+  );
+  if (Number(order.total_cents) !== cartTotal) return false;
+  return JSON.stringify(canonicalItems(order.items)) === JSON.stringify(canonicalItems(cart.items));
+}
+
+function canonicalItems(items = []) {
+  return items.map((item) => ({
+    variant_id: item.variant_id,
+    product_id: item.product_id,
+    seller_id: item.seller_id,
+    seller_user_id: item.seller_user_id || null,
+    product_name: item.product_name,
+    size_name: item.size_name,
+    quantity: Number(item.quantity),
+    unit_price_cents: Number(item.unit_price_cents),
+  })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+}
+
+function cartCurrency(cart) {
+  const currencies = new Set(
+    (cart.items || []).map((item) => String(item.currency).toUpperCase()),
+  );
+  return currencies.size === 1 ? [...currencies][0] : null;
+}
+
+function isConfirmedWithoutCharge(response) {
+  return ['cancelled', 'failed'].includes(response.payment?.status)
+    || ['expired', 'cancelled'].includes(response.checkout?.status);
 }
 
 function toIso(value) {

@@ -22,6 +22,7 @@ test('routes every stable public API family to its owning service', () => {
     '/api/products': 'catalog',
     '/api/seller/profile': 'catalog',
     '/api/cart/items': 'cart',
+    '/api/checkout/active/cancel': 'order',
     '/api/checkout/order-id/cancel': 'order',
     '/api/orders/order-id': 'order',
     '/api/seller/orders/order-id': 'order',

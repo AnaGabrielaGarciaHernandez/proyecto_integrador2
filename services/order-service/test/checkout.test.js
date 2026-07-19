@@ -26,6 +26,7 @@ Module._load = originalLoad;
 
 const BUYER_ID = '11111111-1111-4111-8111-111111111111';
 const ORDER_ID = '22222222-2222-4222-8222-222222222222';
+const REPLACEMENT_ORDER_ID = '88888888-8888-4888-8888-888888888888';
 const VARIANT_ID = '33333333-3333-4333-8333-333333333333';
 const CORRELATION_ID = '44444444-4444-4444-8444-444444444444';
 
@@ -46,9 +47,205 @@ test('duplicate checkout reuses the hosted session without reserving or creating
   const checkout = await fixture.service.createCheckout({ id: BUYER_ID, name: 'Lina' }, CORRELATION_ID);
 
   assert.equal(checkout.url, 'https://checkout.stripe.test/session');
-  assert.equal(fixture.calls.cart, 0);
+  assert.equal(fixture.calls.cart, 1);
   assert.equal(fixture.calls.reserve.length, 0);
   assert.equal(fixture.calls.payment.length, 0);
+});
+
+test('changed cart expires the old session and creates checkout from the new snapshot', async () => {
+  const cartItems = [{ ...baseOrder('created').items[0], quantity: 1 }];
+  const fixture = createFixture({
+    existingStage: 'payment_session_created',
+    cartItems,
+  });
+  const checkout = await fixture.service.createCheckout(
+    { id: BUYER_ID, name: 'Lina' },
+    CORRELATION_ID,
+  );
+
+  assert.equal(checkout.order_id, REPLACEMENT_ORDER_ID);
+  assert.deepEqual(fixture.calls.expire, [ORDER_ID]);
+  assert.deepEqual(fixture.calls.release, [ORDER_ID]);
+  assert.equal(fixture.calls.cart, 3);
+  assert.equal(fixture.calls.reserve[0].order_id, REPLACEMENT_ORDER_ID);
+  assert.equal(fixture.calls.reserve[0].items[0].quantity, 1);
+  assert.equal(fixture.calls.payment[0].amount_cents, 12500);
+  assert.equal(fixture.calls.payment[0].items[0].quantity, 1);
+});
+
+test('same total with a different item does not reuse the old session', async () => {
+  const fixture = createFixture({
+    existingStage: 'payment_session_created',
+    cartItems: [{
+      ...baseOrder('created').items[0],
+      variant_id: '99999999-9999-4999-8999-999999999999',
+      product_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      product_name: 'Sudadera distinta',
+    }],
+  });
+  const checkout = await fixture.service.createCheckout(
+    { id: BUYER_ID, name: 'Lina' },
+    CORRELATION_ID,
+  );
+
+  assert.equal(checkout.order_id, REPLACEMENT_ORDER_ID);
+  assert.deepEqual(fixture.calls.expire, [ORDER_ID]);
+  assert.equal(fixture.calls.payment[0].amount_cents, 25000);
+  assert.equal(fixture.calls.payment[0].items[0].product_name, 'Sudadera distinta');
+});
+
+test('empty changed cart retires the old session and returns CART_EMPTY', async () => {
+  const fixture = createFixture({
+    existingStage: 'payment_session_created',
+    cartItems: [],
+  });
+
+  await assert.rejects(
+    fixture.service.createCheckout({ id: BUYER_ID, name: 'Lina' }, CORRELATION_ID),
+    (error) => error.status === 409 && error.details.code === 'CART_EMPTY',
+  );
+  assert.deepEqual(fixture.calls.expire, [ORDER_ID]);
+  assert.deepEqual(fixture.calls.release, [ORDER_ID]);
+  assert.equal(fixture.calls.reserve.length, 0);
+  assert.equal(fixture.calls.payment.length, 0);
+});
+
+test('completed old session is never released or replaced after the cart changes', async () => {
+  const fixture = createFixture({
+    existingStage: 'payment_session_created',
+    cartItems: [{ ...baseOrder('created').items[0], quantity: 1 }],
+    expireComplete: true,
+  });
+
+  await assert.rejects(
+    fixture.service.createCheckout({ id: BUYER_ID, name: 'Lina' }, CORRELATION_ID),
+    (error) => error.status === 409 && error.details.code === 'CHECKOUT_IN_PROGRESS',
+  );
+  assert.deepEqual(fixture.calls.expire, [ORDER_ID]);
+  assert.deepEqual(fixture.calls.release, []);
+  assert.equal(fixture.calls.reserve.length, 0);
+  assert.equal(fixture.calls.payment.length, 0);
+  assert.equal(fixture.state.order.status, 'pending_payment');
+});
+
+test('ambiguous expiration preserves the old reservation and pending order', async () => {
+  const fixture = createFixture({
+    existingStage: 'payment_session_created',
+    cartItems: [{ ...baseOrder('created').items[0], quantity: 1 }],
+    expireFailure: true,
+  });
+
+  await assert.rejects(
+    fixture.service.createCheckout({ id: BUYER_ID, name: 'Lina' }, CORRELATION_ID),
+    (error) => error.status === 503 && error.details.code === 'CHECKOUT_IN_PROGRESS',
+  );
+  assert.deepEqual(fixture.calls.expire, [ORDER_ID]);
+  assert.deepEqual(fixture.calls.release, []);
+  assert.equal(fixture.calls.reserve.length, 0);
+  assert.equal(fixture.calls.payment.length, 0);
+  assert.equal(fixture.state.order.status, 'pending_payment');
+});
+
+test('wrong-buyer cart snapshot is rejected before expiring the active session', async () => {
+  const fixture = createFixture({
+    existingStage: 'payment_session_created',
+    cartBuyerId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  });
+
+  await assert.rejects(
+    fixture.service.createCheckout({ id: BUYER_ID, name: 'Lina' }, CORRELATION_ID),
+    (error) => error.status === 502 && error.details.code === 'DEPENDENCY_INVALID_RESPONSE',
+  );
+  assert.deepEqual(fixture.calls.expire, []);
+  assert.deepEqual(fixture.calls.release, []);
+});
+
+test('cart mutation during Stripe creation expires the new session instead of returning it', async () => {
+  const fixture = createFixture({
+    cartItemsAfterCheckout: [{ ...baseOrder('created').items[0], quantity: 1 }],
+  });
+
+  await assert.rejects(
+    fixture.service.createCheckout({ id: BUYER_ID, name: 'Lina' }, CORRELATION_ID),
+    (error) => error.status === 409 && error.details.code === 'CHECKOUT_CART_CHANGED',
+  );
+  assert.deepEqual(fixture.calls.expire, [ORDER_ID]);
+  assert.deepEqual(fixture.calls.release, [ORDER_ID]);
+  assert.equal(fixture.calls.payment.length, 1);
+  assert.equal(fixture.state.order.status, 'cancelled');
+});
+
+test('active checkout cancellation uses the pending order stored by the server', async () => {
+  const fixture = createFixture({ existingStage: 'payment_session_created' });
+
+  const order = await fixture.service.cancelActiveCheckout(BUYER_ID, CORRELATION_ID);
+
+  assert.equal(order.status, 'cancelled');
+  assert.deepEqual(fixture.calls.expire, [ORDER_ID]);
+  assert.deepEqual(fixture.calls.release, [ORDER_ID]);
+});
+
+test('active checkout cancellation expires a stored session even after its local deadline', async () => {
+  const fixture = createFixture({ existingStage: 'payment_session_created' });
+  fixture.state.order.checkout_expires_at = '2020-01-01T00:00:00.000Z';
+
+  const order = await fixture.service.cancelActiveCheckout(BUYER_ID, CORRELATION_ID);
+
+  assert.equal(order.status, 'cancelled');
+  assert.deepEqual(fixture.calls.expire, [ORDER_ID]);
+  assert.deepEqual(fixture.calls.release, [ORDER_ID]);
+});
+
+test('active checkout cancellation is a no-op without a pending order', async () => {
+  const fixture = createFixture();
+
+  assert.equal(
+    await fixture.service.cancelActiveCheckout(BUYER_ID, CORRELATION_ID),
+    null,
+  );
+  assert.deepEqual(fixture.calls.expire, []);
+});
+
+test('active checkout cancellation blocks cart changes while checkout creation is uncertain', async () => {
+  const fixture = createFixture({ existingStage: 'inventory_reserved' });
+
+  await assert.rejects(
+    fixture.service.cancelActiveCheckout(BUYER_ID, CORRELATION_ID),
+    (error) => error.status === 409 && error.details.code === 'CHECKOUT_IN_PROGRESS',
+  );
+  assert.deepEqual(fixture.calls.expire, []);
+  assert.deepEqual(fixture.calls.release, []);
+});
+
+test('active checkout cancellation preserves inventory for a non-terminal Payment response', async () => {
+  const fixture = createFixture({
+    existingStage: 'payment_session_created',
+    expireAmbiguousResponse: true,
+  });
+
+  await assert.rejects(
+    fixture.service.cancelActiveCheckout(BUYER_ID, CORRELATION_ID),
+    (error) => error.status === 409 && error.details.code === 'CHECKOUT_IN_PROGRESS',
+  );
+  assert.deepEqual(fixture.calls.expire, [ORDER_ID]);
+  assert.deepEqual(fixture.calls.release, []);
+  assert.equal(fixture.state.order.status, 'pending_payment');
+});
+
+test('active checkout cancellation hides a missing Payment record behind a stable code', async () => {
+  const fixture = createFixture({
+    existingStage: 'payment_session_created',
+    expireNotFound: true,
+  });
+
+  await assert.rejects(
+    fixture.service.cancelActiveCheckout(BUYER_ID, CORRELATION_ID),
+    (error) => error.status === 409
+      && error.details.code === 'CHECKOUT_IN_PROGRESS'
+      && error.message === 'Checkout state is still being confirmed',
+  );
+  assert.deepEqual(fixture.calls.release, []);
+  assert.equal(fixture.state.order.status, 'pending_payment');
 });
 
 test('Stripe creation failure releases inventory immediately', async () => {
@@ -92,17 +289,40 @@ function createFixture({
   existingStage = null,
   paymentFailure = false,
   ambiguousPaymentFailure = false,
+  expireComplete = false,
+  expireFailure = false,
+  expireAmbiguousResponse = false,
+  expireNotFound = false,
+  cartBuyerId = BUYER_ID,
+  cartItems = baseOrder('created').items,
+  cartItemsAfterCheckout = null,
 } = {}) {
-  const calls = { cart: 0, reserve: [], payment: [], release: [] };
+  const calls = {
+    cart: 0, reserve: [], payment: [], expire: [], release: [],
+  };
   const state = { order: existingStage ? baseOrder(existingStage) : null, compensated: false };
   const db = {
     transaction: (work) => work({ query: async () => ({ rows: [] }) }),
     query: async () => ({ rows: [] }),
   };
   const orders = {
-    getPendingByBuyer: async () => state.order,
-    createOrGetPending: async () => {
-      state.order = baseOrder('created');
+    getPendingByBuyer: async () => (
+      state.order?.status === 'pending_payment' ? state.order : null
+    ),
+    createOrGetPending: async ({ cart }) => {
+      if (!cart.items.length) {
+        throw Object.assign(new Error('The cart is empty'), {
+          status: 409,
+          details: { code: 'CART_EMPTY' },
+        });
+      }
+      if (state.order?.status === 'pending_payment') {
+        return { order: state.order, created: false };
+      }
+      state.order = orderFromCart(
+        cart,
+        existingStage ? REPLACEMENT_ORDER_ID : ORDER_ID,
+      );
       return { order: state.order, created: true };
     },
     markInventoryReserved: async () => {
@@ -119,6 +339,18 @@ function createFixture({
       };
       return state.order;
     },
+    getOwnedOrder: async (orderId, buyerId) => {
+      if (state.order?.id !== orderId || state.order?.buyer_id !== buyerId) {
+        throw Object.assign(new Error('Order not found'), { status: 404 });
+      }
+      return state.order;
+    },
+    getBuyerOrder: async (orderId, buyerId) => {
+      if (state.order?.id !== orderId || state.order?.buyer_id !== buyerId) {
+        throw Object.assign(new Error('Order not found'), { status: 404 });
+      }
+      return state.order;
+    },
     getSagaOrder: async () => state.order,
     stageCompensation: async () => {},
     finishCompensation: async () => {
@@ -130,7 +362,10 @@ function createFixture({
   const cartClient = {
     async getSnapshot() {
       calls.cart += 1;
-      return { buyer_id: BUYER_ID, items: baseOrder('created').items };
+      const items = cartItemsAfterCheckout && calls.cart > 1
+        ? cartItemsAfterCheckout
+        : cartItems;
+      return { buyer_id: cartBuyerId, items: items.map((item) => ({ ...item })) };
     },
   };
   const catalogClient = {
@@ -167,6 +402,34 @@ function createFixture({
         },
       };
     },
+    async expire(orderId) {
+      calls.expire.push(orderId);
+      if (expireNotFound) {
+        throw Object.assign(new Error('Payment not found'), { status: 404 });
+      }
+      if (expireFailure) {
+        throw Object.assign(new Error('Payment request timed out'), {
+          status: 503,
+          details: { code: 'CHECKOUT_IN_PROGRESS' },
+        });
+      }
+      if (expireComplete) {
+        return {
+          payment: { status: 'succeeded' },
+          checkout: { status: 'complete' },
+        };
+      }
+      if (expireAmbiguousResponse) {
+        return {
+          payment: { status: 'pending' },
+          checkout: { status: 'open' },
+        };
+      }
+      return {
+        payment: { status: 'cancelled' },
+        checkout: { status: 'expired' },
+      };
+    },
   };
   return {
     calls,
@@ -175,9 +438,19 @@ function createFixture({
   };
 }
 
-function baseOrder(stage) {
+function orderFromCart(cart, id) {
+  const order = baseOrder('created', id);
+  order.items = cart.items.map((item) => ({ ...item }));
+  order.total_cents = cart.items.reduce(
+    (total, item) => total + item.quantity * item.unit_price_cents,
+    0,
+  );
+  return order;
+}
+
+function baseOrder(stage, id = ORDER_ID) {
   return {
-    id: ORDER_ID,
+    id,
     order_number: 'ECO-2026-000001',
     buyer_id: BUYER_ID,
     status: 'pending_payment',

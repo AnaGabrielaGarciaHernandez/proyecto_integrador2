@@ -10,17 +10,20 @@ import {
   LogOut,
   Users,
   Package,
-  BarChart2
+  BarChart2,
+  Heart,
 } from 'lucide-react'
 
 import { contarItems } from '../services/carrito'
 import { useAuth } from '../context/useAuth'
+import { useWishlist } from '../context/useWishlist'
 
 import '../styles/Sidebar.css'
 
 export default function Sidebar({ abierto, onCerrar }) {
   const navigate = useNavigate()
   const { user: usuario, logout } = useAuth()
+  const wishlist = useWishlist()
 
   const [itemsCarrito, setItemsCarrito] = useState(0)
   const cartRequestRevision = useRef(0)
@@ -118,16 +121,21 @@ export default function Sidebar({ abierto, onCerrar }) {
             )}
           </NavLink>
 
-          <NavLink
-            to="/cuenta"
-            onClick={onCerrar}
-            className={({ isActive }) =>
-              isActive ? 'nav-item active' : 'nav-item'
-            }
-          >
-            <User size={17} />
-            Mi cuenta
-          </NavLink>
+          {usuario?.role !== 'admin' && (
+            <NavLink
+              to="/deseos"
+              onClick={onCerrar}
+              className={({ isActive }) =>
+                isActive ? 'nav-item active' : 'nav-item'
+              }
+            >
+              <Heart size={17} />
+              Lista de deseos
+              {wishlist.count > 0 && (
+                <span className="wishlist-nav-badge">{wishlist.count}</span>
+              )}
+            </NavLink>
+          )}
 
         </nav>
 
@@ -230,7 +238,16 @@ export default function Sidebar({ abierto, onCerrar }) {
 
           {usuario ? (
             <>
-              <div className="sidebar-usuario">
+              <NavLink
+                to="/cuenta"
+                onClick={onCerrar}
+                aria-label={`Ir a Mi cuenta de ${usuario.full_name}`}
+                className={({ isActive }) =>
+                  isActive
+                    ? 'sidebar-usuario sidebar-usuario--active'
+                    : 'sidebar-usuario'
+                }
+              >
 
                 <div className="sidebar-usuario-avatar">
                   <User size={18} color="#fff" />
@@ -242,7 +259,7 @@ export default function Sidebar({ abierto, onCerrar }) {
                   </p>
                 </div>
 
-              </div>
+              </NavLink>
 
               <button
                 className="btn-cerrar-sesion"

@@ -18,7 +18,7 @@ function createProductsRouter(db) {
   router.get('/', async (req, res, next) => {
     try {
       const input = parse(ListProductsSchema, req.query, 'Invalid query parameters');
-      const products = await listProducts(db, input);
+      const products = await listProducts(db, input, getOptionalUserId(req));
       res.json({ products, pagination: { limit: input.limit, offset: input.offset } });
     } catch (error) {
       next(error);
@@ -28,13 +28,18 @@ function createProductsRouter(db) {
   router.get('/:id', async (req, res, next) => {
     try {
       const id = parse(z.string().uuid(), req.params.id, 'Invalid product id');
-      res.json({ product: await getProduct(db, id) });
+      res.json({ product: await getProduct(db, id, getOptionalUserId(req)) });
     } catch (error) {
       next(error);
     }
   });
 
   return router;
+}
+
+function getOptionalUserId(req) {
+  const result = z.string().uuid().safeParse(req.get('x-user-id'));
+  return result.success ? result.data : null;
 }
 
 function parse(schema, value, message) {

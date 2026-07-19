@@ -12,6 +12,7 @@ import VenderScreen   from '../screens/VenderScreen'
 import AdminScreen from '../screens/AdminScreen'
 import OrdersScreen from '../screens/OrdersScreen'
 import AtencionClienteScreen from '../screens/AtencionClienteScreen'
+import WishlistScreen from '../screens/WishlistScreen'
 import { CheckoutSuccessScreen, CheckoutCancelledScreen } from '../screens/CheckoutStatusScreen'
 
 export default function AppRouter() {
@@ -26,6 +27,7 @@ export default function AppRouter() {
         <Route path="/checkout/exito" element={<CheckoutSuccessScreen />} />
         <Route path="/checkout/cancelado" element={<CheckoutCancelledScreen />} />
         <Route path="/cuenta"       element={<CuentaScreen />} />
+        <Route path="/deseos"       element={<WishlistScreen />} />
         <Route path="/producto/:id" element={<ProductoScreen />} />
         <Route path="/login"        element={<LoginScreen />} />
         <Route path="/registro"     element={<RegistroScreen />} />

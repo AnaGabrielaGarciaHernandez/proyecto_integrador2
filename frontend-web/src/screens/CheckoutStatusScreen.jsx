@@ -3,11 +3,13 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { CheckCircle2, Clock3, XCircle } from 'lucide-react'
 import { cancelarCheckout } from '../services/checkout'
 import { getOrder } from '../services/orders'
+import { useWishlist } from '../context/useWishlist'
 import '../styles/CheckoutStatusScreen.css'
 
 const MAX_POLLS = 10
 
 export function CheckoutSuccessScreen() {
+  const { hidePurchased } = useWishlist()
   const [params] = useSearchParams()
   const orderId = params.get('order_id')
   const [order, setOrder] = useState(null)
@@ -29,7 +31,10 @@ export function CheckoutSuccessScreen() {
         if (!active) return
         setOrder(nextOrder)
         if (nextOrder.status === 'paid' || nextOrder.status !== 'pending_payment') {
-          if (nextOrder.status === 'paid') window.dispatchEvent(new Event('carritoActualizado'))
+          if (nextOrder.status === 'paid') {
+            window.dispatchEvent(new Event('carritoActualizado'))
+            hidePurchased((nextOrder.items || []).map((item) => item.product_id))
+          }
           setFinishedPolling(true)
           return
         }
@@ -46,7 +51,7 @@ export function CheckoutSuccessScreen() {
       active = false
       window.clearTimeout(timeout)
     }
-  }, [orderId])
+  }, [hidePurchased, orderId])
 
   const paid = order?.status === 'paid'
   return (

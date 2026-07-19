@@ -8,6 +8,7 @@ const {
 const { createProductsRouter } = require('./routes/products');
 const { createInternalRouter } = require('./routes/internal');
 const { createSellerRouter } = require('./routes/seller');
+const { createWishlistRouter } = require('./routes/wishlist');
 
 function createApp({ db, config }) {
   const app = express();
@@ -27,6 +28,7 @@ function createApp({ db, config }) {
   });
 
   app.use('/api/products', createProductsRouter(db));
+  app.use('/api/wishlist', createWishlistRouter(db));
   app.use('/api/seller', createSellerRouter());
   app.use('/internal', createInternalRouter({ db, internalToken: config.INTERNAL_SERVICE_TOKEN }));
   app.use(notFound);

@@ -3,6 +3,7 @@ import { ShoppingCart } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { agregarAlCarrito } from "../services/carrito";
 import { useAuth } from "../context/useAuth";
+import WishlistButton from "./WishlistButton";
 import "../styles/ProductCard.css";
 
 export default function ProductCard({ producto, onAgregar, onError }) {
@@ -60,6 +61,11 @@ export default function ProductCard({ producto, onAgregar, onError }) {
 
       <div className="card-imagen">
         <img src={imagen} alt={nombre} />
+        <WishlistButton
+          productId={id}
+          productName={nombre}
+          className="product-card-wishlist"
+        />
 
         <div className="card-badges-top">
           {tipo && (

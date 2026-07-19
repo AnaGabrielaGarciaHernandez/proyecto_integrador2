@@ -6,6 +6,7 @@ const {
   reservationFingerprint,
   reserveInventory,
   confirmInventoryWithClient,
+  confirmPaidOrderWithClient,
   releaseInventory,
   releaseInventoryWithClient,
 } = require('../src/services/inventory');
@@ -201,6 +202,81 @@ test('confirmInventoryWithClient is idempotent and never changes reserved stock'
   assert.equal(status, 'confirmed');
   assert.equal(confirmations, 1);
   assert.equal(statements.some((sql) => /SET stock/.test(sql)), false);
+});
+
+test('paid orders confirm inventory and remove only the buyer wishlist rows from before the event', async () => {
+  let status = 'active';
+  const deletions = [];
+  const occurredAt = '2030-01-01T00:00:00.000Z';
+  const client = {
+    async query(sql, params = []) {
+      if (/SELECT buyer_id FROM inventory_reservations/.test(sql)) {
+        return { rows: [{ buyer_id: BUYER_ID }] };
+      }
+      if (/SELECT status FROM inventory_reservations/.test(sql)) return { rows: [{ status }] };
+      if (/SET status = 'confirmed'/.test(sql)) {
+        status = 'confirmed';
+        return { rows: [] };
+      }
+      if (/SELECT order_id, buyer_id, status/.test(sql)) {
+        return { rows: [{ order_id: ORDER_ID, buyer_id: BUYER_ID, status }] };
+      }
+      if (/FROM inventory_reservation_items/.test(sql) && !/DELETE FROM/.test(sql)) {
+        return { rows: [
+          { variant_id: VARIANT_A, product_id: '50000000-0000-4000-8000-000000000001' },
+          { variant_id: VARIANT_B, product_id: '50000000-0000-4000-8000-000000000001' },
+        ] };
+      }
+      if (/DELETE FROM wishlist_items/.test(sql)) {
+        deletions.push({ sql, params });
+        return { rows: [] };
+      }
+      return { rows: [] };
+    },
+  };
+
+  await confirmPaidOrderWithClient(client, {
+    orderId: ORDER_ID,
+    buyerId: BUYER_ID,
+    occurredAt,
+    correlationId: '40000000-0000-4000-8000-000000000001',
+  });
+  await confirmPaidOrderWithClient(client, {
+    orderId: ORDER_ID,
+    buyerId: BUYER_ID,
+    occurredAt,
+    correlationId: '40000000-0000-4000-8000-000000000001',
+  });
+
+  assert.equal(status, 'confirmed');
+  assert.equal(deletions.length, 2);
+  assert.deepEqual(deletions[0].params, [ORDER_ID, BUYER_ID, occurredAt]);
+  assert.match(deletions[0].sql, /SELECT DISTINCT product_id/);
+  assert.match(deletions[0].sql, /wish\.user_id = \$2/);
+  assert.match(deletions[0].sql, /wish\.created_at <= \$3::timestamptz/);
+});
+
+test('paid order rejects a buyer that does not own the stored reservation', async () => {
+  let changed = false;
+  const client = {
+    async query(sql) {
+      if (/SELECT buyer_id FROM inventory_reservations/.test(sql)) {
+        return { rows: [{ buyer_id: BUYER_ID }] };
+      }
+      if (/UPDATE|DELETE/.test(sql)) changed = true;
+      return { rows: [] };
+    },
+  };
+  await assert.rejects(
+    confirmPaidOrderWithClient(client, {
+      orderId: ORDER_ID,
+      buyerId: '20000000-0000-4000-8000-000000000099',
+      occurredAt: '2030-01-01T00:00:00.000Z',
+      correlationId: '40000000-0000-4000-8000-000000000001',
+    }),
+    /buyer does not match/,
+  );
+  assert.equal(changed, false);
 });
 
 function variantRow(variantId, stock) {

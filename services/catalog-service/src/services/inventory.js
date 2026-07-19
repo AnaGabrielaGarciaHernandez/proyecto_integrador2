@@ -156,6 +156,40 @@ async function confirmInventory(db, orderId, correlationId) {
   return db.transaction((client) => confirmInventoryWithClient(client, orderId, correlationId));
 }
 
+async function confirmPaidOrderWithClient(
+  client,
+  { orderId, buyerId, occurredAt, correlationId },
+) {
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [orderId]);
+  const owner = await client.query(
+    'SELECT buyer_id FROM inventory_reservations WHERE order_id = $1 FOR UPDATE',
+    [orderId],
+  );
+  if (!owner.rows[0]) throw createHttpError('Inventory reservation not found', 404);
+  if (owner.rows[0].buyer_id !== buyerId) {
+    throw new Error('Paid order buyer does not match inventory reservation buyer');
+  }
+
+  const reservation = await confirmInventoryWithClient(
+    client,
+    orderId,
+    correlationId,
+  );
+  await client.query(
+    `DELETE FROM wishlist_items wish
+     USING (
+       SELECT DISTINCT product_id
+       FROM inventory_reservation_items
+       WHERE order_id = $1
+     ) purchased
+     WHERE wish.user_id = $2
+       AND wish.product_id = purchased.product_id
+       AND wish.created_at <= $3::timestamptz`,
+    [orderId, buyerId, occurredAt],
+  );
+  return reservation;
+}
+
 async function confirmInventoryWithClient(client, orderId, correlationId, { allowMissing = false } = {}) {
   await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [orderId]);
   const locked = await client.query(
@@ -215,4 +249,5 @@ module.exports = {
   releaseInventoryWithClient,
   confirmInventory,
   confirmInventoryWithClient,
+  confirmPaidOrderWithClient,
 };

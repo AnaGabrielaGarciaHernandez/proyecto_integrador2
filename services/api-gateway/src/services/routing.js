@@ -2,6 +2,7 @@ const ROUTES = Object.freeze([
   { prefix: '/api/seller/orders', service: 'order' },
   { prefix: '/api/auth', service: 'identity' },
   { prefix: '/api/products', service: 'catalog' },
+  { prefix: '/api/wishlist', service: 'catalog' },
   { prefix: '/api/seller', service: 'catalog' },
   { prefix: '/api/cart', service: 'cart' },
   { prefix: '/api/checkout', service: 'order' },

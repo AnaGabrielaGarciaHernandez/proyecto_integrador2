@@ -1,11 +1,9 @@
 import { useState } from 'react'
 import {
-  Headphones,
   MessageCircle,
   Mail,
   Clock3,
   ShieldCheck,
-  ArrowRight,
   ChevronDown
 } from 'lucide-react'
 import '../styles/AtencionClienteScreen.css'

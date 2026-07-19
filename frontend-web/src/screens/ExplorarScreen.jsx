@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, ShoppingCart } from "lucide-react";
 import ProductCard from "../components/ProductCard";
+import { useAuth } from "../context/useAuth";
 import { getProducts } from "../services/products";
 import "../styles/ExplorarScreen.css";
 
@@ -16,6 +17,7 @@ const categorias = [
 ];
 
 export default function ExplorarScreen() {
+  const { user, loading: authLoading } = useAuth();
   const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -26,6 +28,7 @@ export default function ExplorarScreen() {
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("Todo");
 
   useEffect(() => {
+    if (authLoading) return undefined;
     let mounted = true;
 
     getProducts({ limit: 48 })
@@ -43,7 +46,7 @@ export default function ExplorarScreen() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [authLoading, user?.id]);
 
   function handleAgregar(producto) {
     setActionError("");

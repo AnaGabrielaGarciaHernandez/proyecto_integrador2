@@ -1,6 +1,6 @@
 const { EVENT_TYPES } = require('@ecobazar/contracts');
 const {
-  confirmInventoryWithClient,
+  confirmPaidOrderWithClient,
   releaseInventoryWithClient,
 } = require('../services/inventory');
 
@@ -13,7 +13,12 @@ function createCatalogEventHandler() {
         await upsertUserProjection(client, payload);
         break;
       case EVENT_TYPES.ORDER_PAID:
-        await confirmInventoryWithClient(client, payload.order_id, event.correlation_id);
+        await confirmPaidOrderWithClient(client, {
+          orderId: payload.order_id,
+          buyerId: payload.buyer_id,
+          occurredAt: event.occurred_at,
+          correlationId: event.correlation_id,
+        });
         break;
       case EVENT_TYPES.ORDER_CANCELLED:
         await releaseInventoryWithClient(client, payload.order_id, event.correlation_id, { allowMissing: true });

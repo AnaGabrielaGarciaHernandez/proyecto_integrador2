@@ -1,7 +1,7 @@
 const { createHttpError } = require('@ecobazar/platform');
 
-async function listProducts(db, input) {
-  const params = ['active'];
+async function listProducts(db, input, userId = null) {
+  const params = ['active', userId];
   const where = [
     'p.status = $1',
     productSellerFilter(),
@@ -27,7 +27,7 @@ async function listProducts(db, input) {
 
   params.push(input.limit, input.offset);
   const result = await db.query(
-    `${productSelect()}
+    `${productSelect({ userIdParameter: 2 })}
      WHERE ${where.join(' AND ')}
      ORDER BY p.created_at DESC
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -36,16 +36,20 @@ async function listProducts(db, input) {
   return result.rows;
 }
 
-async function getProduct(db, id) {
+async function getProduct(db, id, userId = null) {
   const result = await db.query(
-    `${productSelect({ detail: true })}
+    `${productSelect({ detail: true, userIdParameter: 2 })}
      WHERE p.id = $1
        AND p.status = 'active'
        AND ${productSellerFilter()}
        AND ${productAvailabilityFilter()}`,
-    [id],
+    [id, userId],
   );
-  if (!result.rows[0]) throw createHttpError('Product not found', 404);
+  if (!result.rows[0]) {
+    throw createHttpError('Este producto no está disponible.', 404, {
+      code: 'PRODUCT_UNAVAILABLE',
+    });
+  }
   return result.rows[0];
 }
 
@@ -103,7 +107,7 @@ async function resolveVariants(db, variantIds, buyerId = null) {
   return result.rows;
 }
 
-function productSelect({ detail = false } = {}) {
+function productSelect({ detail = false, userIdParameter = null } = {}) {
   return `SELECT
     p.id,
     p.name,
@@ -113,6 +117,13 @@ function productSelect({ detail = false } = {}) {
     p.currency,
     p.status,
     p.created_at,
+    ${userIdParameter
+    ? `EXISTS (
+      SELECT 1 FROM wishlist_items wish
+      WHERE wish.user_id = $${userIdParameter}::uuid
+        AND wish.product_id = p.id
+    ) AS is_wishlisted,`
+    : 'false AS is_wishlisted,'}
     ${detail ? 'p.updated_at, p.published_at,' : ''}
     json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS category,
     json_build_object(
@@ -190,4 +201,11 @@ function productSellerFilter() {
   )`;
 }
 
-module.exports = { listProducts, getProduct, resolveVariants };
+module.exports = {
+  getProduct,
+  listProducts,
+  productAvailabilityFilter,
+  productSelect,
+  productSellerFilter,
+  resolveVariants,
+};

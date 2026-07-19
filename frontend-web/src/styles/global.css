@@ -36,3 +36,29 @@ ul {
 body {
   overflow-x: hidden;
 }
+
+.wishlist-feedback {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1000;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 13px 18px;
+  border-radius: 12px;
+  background: #153c28;
+  color: #fff;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wishlist-feedback--error {
+  background: #991b1b;
+}
+
+@media (max-width: 768px) {
+  .wishlist-feedback {
+    right: 16px;
+    bottom: 16px;
+  }
+}

@@ -92,6 +92,13 @@ export function patch(path, body) {
   })
 }
 
+export function put(path, body) {
+  return request(path, {
+    method: 'PUT',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+}
+
 export function del(path) {
   return request(path, {
     method: 'DELETE',

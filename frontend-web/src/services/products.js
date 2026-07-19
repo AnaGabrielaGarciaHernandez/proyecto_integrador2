@@ -31,7 +31,7 @@ export async function getProduct(id) {
   return product
 }
 
-function mapProduct(product) {
+export function mapProduct(product) {
   const variants = product.variants || []
   const firstAvailableVariant = variants.find((variant) => variant.stock > 0) || null
   const price = centsToPesos(product.price_cents)
@@ -63,6 +63,8 @@ function mapProduct(product) {
     varianteDisponible: firstAvailableVariant,
     totalStock,
     availabilityStatus,
+    isWishlisted: product.is_wishlisted === true,
+    wishlistedAt: product.wishlisted_at || null,
     agotadoTemporalmente: temporarilyUnavailable,
     tipo: temporarilyUnavailable
       ? 'Sold out'

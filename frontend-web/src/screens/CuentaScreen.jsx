@@ -51,7 +51,10 @@ export default function CuentaScreen() {
                 <ChevronRight size={16} className="cuenta-opcion-arrow" />
               </button>
 
-              <button className="cuenta-opcion">
+              <button
+                className="cuenta-opcion"
+                onClick={() => navigate('/deseos')}
+              >
                 <div className="cuenta-opcion-icono" style={{ background: '#fee2e2' }}>
                   <Heart size={20} color="#ef4444" />
                 </div>

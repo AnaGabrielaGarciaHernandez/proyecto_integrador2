@@ -103,6 +103,7 @@ export default function HomeScreen() {
   const [bannerError, setBannerError] = useState(null)
 
   useEffect(() => {
+    if (authLoading) return undefined
     let mounted = true
 
     getProducts({ limit: 12 })
@@ -120,7 +121,7 @@ export default function HomeScreen() {
     return () => {
       mounted = false
     }
-  }, [])
+  }, [authLoading, user?.id])
 
   function handleAgregar(producto) {
     setError('')

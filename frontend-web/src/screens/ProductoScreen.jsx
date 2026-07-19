@@ -16,13 +16,14 @@ import {
 import { agregarAlCarrito } from '../services/carrito'
 import { getProduct } from '../services/products'
 import { useAuth } from '../context/useAuth'
+import WishlistButton from '../components/WishlistButton'
 
 import '../styles/ProductoScreen.css'
 
 export default function ProductoScreen() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
 
   const [imagenAbierta, setImagenAbierta] = useState(false)
   const [toast, setToast] = useState(false)
@@ -33,6 +34,7 @@ export default function ProductoScreen() {
   const [agregando, setAgregando] = useState(false)
 
   useEffect(() => {
+    if (authLoading) return undefined
     let mounted = true
 
     getProduct(id)
@@ -57,7 +59,7 @@ export default function ProductoScreen() {
     return () => {
       mounted = false
     }
-  }, [id])
+  }, [authLoading, id, user?.id])
 
   if (cargando) {
     return (
@@ -176,6 +178,12 @@ export default function ProductoScreen() {
         >
           <ArrowLeft size={18} />
         </button>
+
+        <WishlistButton
+          productId={producto.id}
+          productName={producto.nombre}
+          className="producto-wishlist"
+        />
 
       </div>
 

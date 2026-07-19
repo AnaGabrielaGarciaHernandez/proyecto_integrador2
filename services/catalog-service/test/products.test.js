@@ -34,6 +34,22 @@ test('listProducts publishes available and temporarily unavailable products only
     statement.sql,
     /COALESCE\(variants\.total_stock, 0\) > 0\s+OR COALESCE\(active_reservation\.has_active_reservation, false\)/,
   );
+  assert.match(statement.sql, /FROM wishlist_items wish/);
+  assert.equal(statement.params[1], null);
+});
+
+test('product DTO computes wishlist membership for the authenticated account', async () => {
+  let statement;
+  const db = {
+    async query(sql, params) {
+      statement = { sql, params };
+      return { rows: [] };
+    },
+  };
+  await listProducts(db, { limit: 24, offset: 0 }, BUYER_ID);
+  assert.equal(statement.params[1], BUYER_ID);
+  assert.match(statement.sql, /wish\.user_id = \$2::uuid/);
+  assert.match(statement.sql, /wish\.product_id = p\.id/);
 });
 
 test('getProduct applies availability rules and returns its public status', async () => {
@@ -67,7 +83,9 @@ test('getProduct returns 404 when no active, publishable inventory exists', asyn
 
   await assert.rejects(
     getProduct(db, PRODUCT_ID),
-    (error) => error.status === 404 && error.message === 'Product not found',
+    (error) => error.status === 404
+      && error.message === 'Este producto no está disponible.'
+      && error.details.code === 'PRODUCT_UNAVAILABLE',
   );
 });
 

@@ -39,20 +39,6 @@ Para ejecutar toda la aplicación sólo necesitas:
 
 No necesitas instalar PostgreSQL, RabbitMQ ni Node.js para levantar el proyecto con Docker.
 
-## Si Ya Tenías Una Versión Antigua
-
-Para este cambio de arquitectura es preferible hacer un clon nuevo en lugar de actualizar una carpeta antigua:
-
-1. Guarda fuera del repositorio cualquier archivo o cambio propio que necesites conservar.
-2. Renombra la carpeta antigua como respaldo.
-3. Clona nuevamente el repositorio siguiendo la sección de tu sistema operativo.
-4. Crea un `.env` nuevo desde `.env.example`.
-5. No copies `node_modules`, `.env`, `.secrets` ni datos locales de PostgreSQL de la versión anterior.
-
-Cuando la instalación nueva funcione, puedes eliminar la carpeta de respaldo.
-
-Si alguien ya alcanzó a levantar la versión de microservicios y también quiere borrar sus datos de prueba, debe ejecutar `docker compose down -v` desde esa instalación antes de eliminarla. Este comando es destructivo; no debe usarse si necesita conservar esa base local.
-
 ## Opción A: Windows 10/11 Con PowerShell
 
 ### 1. Preparar Docker Desktop

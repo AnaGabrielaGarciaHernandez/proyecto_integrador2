@@ -70,6 +70,7 @@ function serializeUser(user) {
     auth_provider: user.auth_provider,
     phone: user.phone,
     bio: user.bio,
+    avatar_url: user.avatar_url || null,
     is_active: user.is_active,
     created_at: user.created_at,
     preferences: {

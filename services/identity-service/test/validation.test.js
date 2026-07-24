@@ -4,6 +4,7 @@ const {
   googleSchema,
   loginSchema,
   preferencesSchema,
+  profileSchema,
   registerSchema,
 } = require('../src/services/validation');
 
@@ -25,6 +26,16 @@ test('rejects malformed registration and login payloads', () => {
   }).success, false);
   assert.equal(loginSchema.safeParse({ email: 'person@example.com', password: '' }).success, false);
   assert.equal(googleSchema.safeParse({ id_token: '' }).success, false);
+});
+
+test('accepts profile updates with a display name and a real avatar photo URL', () => {
+  const result = profileSchema.parse({
+    full_name: 'Nuevo nombre',
+    avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80',
+  });
+
+  assert.equal(result.full_name, 'Nuevo nombre');
+  assert.match(result.avatar_url, /^https:\/\//);
 });
 
 test('accepts only a present boolean home banner preference', () => {

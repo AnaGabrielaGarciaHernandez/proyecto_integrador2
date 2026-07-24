@@ -65,9 +65,9 @@ export function AuthProvider({ children }) {
     return data.user
   }, [commitSessionUser, invalidatePendingPreferences])
 
-  const register = useCallback(async ({ full_name, email, password, phone }) => {
+  const register = useCallback(async ({ full_name, email, password, phone, avatar_url }) => {
     invalidatePendingPreferences()
-    const data = await post('/auth/register', { full_name, email, password, phone })
+    const data = await post('/auth/register', { full_name, email, password, phone, avatar_url })
     commitSessionUser(data.user)
     window.dispatchEvent(new Event('authActualizado'))
     return data.user
@@ -113,6 +113,19 @@ export function AuthProvider({ children }) {
     return data.user
   }, [])
 
+  const updateProfile = useCallback(async (profile) => {
+    const currentUser = userRef.current
+    if (!currentUser) {
+      throw new Error('Debes iniciar sesión para editar tu perfil.')
+    }
+
+    const data = await patch('/auth/profile', profile)
+    userRef.current = data.user
+    setUser(data.user)
+    window.dispatchEvent(new Event('authActualizado'))
+    return data.user
+  }, [])
+
   const value = useMemo(() => ({
     user,
     loading,
@@ -121,6 +134,7 @@ export function AuthProvider({ children }) {
     logout,
     loginWithGoogleToken,
     updatePreferences,
+    updateProfile,
   }), [
     user,
     loading,
@@ -129,6 +143,7 @@ export function AuthProvider({ children }) {
     logout,
     loginWithGoogleToken,
     updatePreferences,
+    updateProfile,
   ])
 
   return (

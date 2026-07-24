@@ -289,10 +289,6 @@ export default function ProductoScreen() {
             </p>
           </div>
 
-          <button className="btn-ver-perfil">
-            Ver perfil
-          </button>
-
         </div>
 
         <div className="producto-descripcion">

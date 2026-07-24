@@ -6,11 +6,13 @@ import { hasGoogleClientId } from '../services/googleAuth'
 import GoogleLoginButton from '../components/GoogleLoginButton'
 import '../styles/RegistroScreen.css'
 
-const EMOJIS = [
-  '🌿', '🌱', '🌾', '🍃', '🌲', '🌵',
-  '🌸', '🌺', '🍀', '🦋', '🌙', '⭐',
-  '🔥', '💎', '🎯', '🎨', '🎸', '🚀',
-  '🦊', '🦝', '🦫', '🌊', '⛰️', '🎭',
+const REAL_AVATARS = [
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
+  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=200&q=80',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
+  'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=200&q=80',
+  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=200&q=80',
 ]
 
 export default function RegistroScreen() {
@@ -21,7 +23,7 @@ export default function RegistroScreen() {
   const [correo, setCorreo]         = useState('')
   const [contrasena, setContrasena] = useState('')
   const [verPass, setVerPass]       = useState(false)
-  const [emoji, setEmoji]           = useState('🌿')
+  const [avatarUrl, setAvatarUrl]   = useState(REAL_AVATARS[0])
   const [toast, setToast]           = useState(false)
   const [error, setError]           = useState('')
   const [cargando, setCargando]     = useState(false)
@@ -43,6 +45,7 @@ export default function RegistroScreen() {
         full_name: nombre,
         email: correo,
         password: contrasena,
+        avatar_url: avatarUrl,
       })
       setToast(true)
       setTimeout(() => {
@@ -74,25 +77,28 @@ export default function RegistroScreen() {
     return (
       <div>
         <div className="emoji-hero">
-          <h1>Elige tu emoji</h1>
+          <h1>Elige tu foto</h1>
           <p>Este será tu avatar en EcoBazar</p>
         </div>
 
         <div className="emoji-body">
           <div className="emoji-grid">
-            {EMOJIS.map(e => (
+            {REAL_AVATARS.map((photo) => (
               <button
-                key={e}
-                className={`emoji-item ${e === emoji ? 'seleccionado' : ''}`}
-                onClick={() => setEmoji(e)}
+                key={photo}
+                className={`emoji-item ${photo === avatarUrl ? 'seleccionado' : ''}`}
+                onClick={() => setAvatarUrl(photo)}
+                type="button"
               >
-                {e}
+                <img src={photo} alt="Avatar de perfil" className="emoji-avatar-photo" />
               </button>
             ))}
           </div>
 
           <div className="emoji-preview">
-            <div className="emoji-preview-avatar">{emoji}</div>
+            <div className="emoji-preview-avatar">
+              <img src={avatarUrl} alt="Vista previa" className="emoji-avatar-photo" />
+            </div>
             <div className="emoji-preview-info">
               <p>{nombre || 'Tu nombre'}</p>
               <span>Vista previa de tu perfil</span>
@@ -108,7 +114,7 @@ export default function RegistroScreen() {
 
         {toast && (
           <div className="toast-bienvenida">
-            {emoji} ¡Bienvenido a EcoBazar, {nombre}!
+            ¡Bienvenido a EcoBazar, {nombre}!
           </div>
         )}
       </div>
@@ -187,7 +193,7 @@ export default function RegistroScreen() {
         </p>
 
         <button className="btn-login-principal" onClick={handleContinuar}>
-          Continuar — elegir emoji <ChevronRight size={16} />
+          Continuar — elegir foto <ChevronRight size={16} />
         </button>
 
         <p className="registro-login">

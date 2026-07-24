@@ -203,6 +203,14 @@ export default function HomeScreen() {
         </div>
       )}
 
+      <Link
+        to="/explorar"
+        className="banner-categoria"
+      >
+        <p>Explorar por categoría</p>
+        <ChevronRight size={20} />
+      </Link>
+
       <div className="home-seccion">
         <div className="seccion-header">
           <h2 className="seccion-titulo">
@@ -248,14 +256,6 @@ export default function HomeScreen() {
           onError={handleAgregarError}
         />
       </div>
-
-      <Link
-        to="/explorar"
-        className="banner-categoria"
-      >
-        <p>Explorar por categoría</p>
-        <ChevronRight size={20} />
-      </Link>
 
       {mostrarBannerVender && (
         <div className={`banner-vender ${user ? 'banner-vender--cerrable' : ''}`}>

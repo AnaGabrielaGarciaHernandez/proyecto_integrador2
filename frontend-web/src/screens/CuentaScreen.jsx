@@ -1,19 +1,73 @@
+import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
   Package, Heart, MapPin,
   RefreshCw, LogOut, ChevronRight,
-  Users, ShoppingBag, BarChart2, Tag, AlertCircle
+  Users, ShoppingBag, BarChart2, Tag, AlertCircle,
+  Pencil
 } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import '../styles/CuentaScreen.css'
 
+const DEFAULT_AVATAR_URL = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80'
+
 export default function CuentaScreen() {
   const navigate = useNavigate()
-  const { user: usuario, logout } = useAuth()
+  const { user: usuario, logout, updateProfile } = useAuth()
+  const [nombre, setNombre] = useState(usuario?.full_name || '')
+  const [avatarUrl, setAvatarUrl] = useState(usuario?.avatar_url || DEFAULT_AVATAR_URL)
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+  const [mensaje, setMensaje] = useState('')
+  const [mostrarEditor, setMostrarEditor] = useState(false)
+
+  useEffect(() => {
+    setNombre(usuario?.full_name || '')
+    setAvatarUrl(usuario?.avatar_url || DEFAULT_AVATAR_URL)
+  }, [usuario?.full_name, usuario?.avatar_url])
 
   async function handleCerrarSesion() {
     await logout()
     navigate('/')
+  }
+
+  async function handleGuardarPerfil(event) {
+    event.preventDefault()
+    setError('')
+    setMensaje('')
+
+    if (!nombre.trim()) {
+      setError('Escribe un nombre visible para tu perfil.')
+      return
+    }
+
+    try {
+      setGuardando(true)
+      await updateProfile({
+        full_name: nombre.trim(),
+        avatar_url: avatarUrl.trim() || DEFAULT_AVATAR_URL,
+      })
+      setMensaje('Tu perfil se actualizó correctamente.')
+      setMostrarEditor(false)
+    } catch (err) {
+      setError(err.message || 'No se pudo guardar tu perfil.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  function handleArchivoSeleccionado(event) {
+    const archivo = event.target.files?.[0]
+    if (!archivo) return
+
+    const lector = new FileReader()
+    lector.onload = () => {
+      setAvatarUrl(String(lector.result))
+    }
+    lector.onerror = () => {
+      setError('No se pudo leer la foto seleccionada.')
+    }
+    lector.readAsDataURL(archivo)
   }
 
   if (!usuario) {
@@ -31,11 +85,89 @@ export default function CuentaScreen() {
   return (
     <div>
       <div className="cuenta-hero">
-        <div className="cuenta-avatar">🌿</div>
+        <div className="cuenta-avatar">
+          <img
+            src={usuario.avatar_url || DEFAULT_AVATAR_URL}
+            alt={usuario.full_name}
+            className="cuenta-avatar-imagen"
+          />
+        </div>
         <h1 className="cuenta-nombre">{usuario.full_name}</h1>
       </div>
 
       <div className="cuenta-body">
+        {!mostrarEditor && (
+          <div className="cuenta-acciones-editar">
+            <button
+              type="button"
+              className="btn-editar-perfil"
+              onClick={() => setMostrarEditor(true)}
+            >
+              <Pencil size={16} />
+              Editar perfil
+            </button>
+          </div>
+        )}
+
+        {mostrarEditor && (
+          <form className="cuenta-formulario" onSubmit={handleGuardarPerfil}>
+            <div className="cuenta-formulario-header">
+              <div>
+                <h2>Editar perfil</h2>
+                <p>Personaliza tu nombre y foto de perfil.</p>
+              </div>
+              <Pencil size={16} color="var(--color-accent)" />
+            </div>
+
+            <div className="cuenta-form-group">
+              <label htmlFor="full_name">Nombre de usuario</label>
+              <input
+                id="full_name"
+                type="text"
+                value={nombre}
+                onChange={(event) => setNombre(event.target.value)}
+              />
+            </div>
+
+            <div className="cuenta-form-group">
+              <label htmlFor="avatar_file">Foto de perfil</label>
+              <input
+                id="avatar_file"
+                type="file"
+                accept="image/*"
+                onChange={handleArchivoSeleccionado}
+              />
+            </div>
+
+            {avatarUrl && (
+              <div className="cuenta-preview-avatar">
+                <img src={avatarUrl} alt="Vista previa del perfil" />
+              </div>
+            )}
+
+            {error && <div className="login-error">{error}</div>}
+            {mensaje && <div className="cuenta-success">{mensaje}</div>}
+
+            <div className="cuenta-form-buttons">
+              <button className="btn-guardar-perfil" type="submit" disabled={guardando}>
+                {guardando ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+              <button
+                className="btn-cancelar-perfil"
+                type="button"
+                onClick={() => {
+                  setMostrarEditor(false)
+                  setError('')
+                  setMensaje('')
+                  setNombre(usuario?.full_name || '')
+                  setAvatarUrl(usuario?.avatar_url || DEFAULT_AVATAR_URL)
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        )}
 
         {(usuario.role === 'cliente' || usuario.role === 'vendedor') && (
           <>

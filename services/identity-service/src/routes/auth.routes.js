@@ -14,12 +14,13 @@ const {
   googleSchema,
   loginSchema,
   preferencesSchema,
+  profileSchema,
   registerSchema,
 } = require('../services/validation');
 
 const userColumns = `
   id, email, full_name, password_hash, auth_provider, role,
-  phone, bio, is_active, created_at, show_home_sell_banner
+  phone, bio, avatar_url, is_active, created_at, show_home_sell_banner
 `;
 
 function createAuthRouter({ db, config, privateKey, publicKey, googleClient, requireAuth }) {
@@ -39,10 +40,10 @@ function createAuthRouter({ db, config, privateKey, publicKey, googleClient, req
       const created = await db.transaction(async (client) => {
         const result = await client.query(
           `INSERT INTO identity.users
-             (email, full_name, password_hash, auth_provider, phone, email_verified_at)
-           VALUES ($1, $2, $3, 'email', $4, now())
+             (email, full_name, password_hash, auth_provider, phone, avatar_url, email_verified_at)
+           VALUES ($1, $2, $3, 'email', $4, $5, now())
            RETURNING ${userColumns}`,
-          [input.email, input.full_name, passwordHash, input.phone || null],
+          [input.email, input.full_name, passwordHash, input.phone || null, input.avatar_url || null],
         );
         const user = result.rows[0];
         const session = await createSession(client, user, tokenOptions);
@@ -127,6 +128,7 @@ function createAuthRouter({ db, config, privateKey, publicKey, googleClient, req
   });
 
   router.patch('/preferences', requireAuth, createUpdatePreferencesHandler({ db }));
+  router.patch('/profile', requireAuth, createUpdateProfileHandler({ db }));
 
   router.post('/google', async (req, res, next) => {
     try {
@@ -175,6 +177,26 @@ function createUpdatePreferencesHandler({ db }) {
          WHERE id = $1 AND is_active = true
          RETURNING ${userColumns}`,
         [req.user.id, input.show_home_sell_banner],
+      );
+      if (!result.rows[0]) throw createHttpError('Invalid session', 401);
+      res.json({ user: serializeUser(result.rows[0]) });
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+function createUpdateProfileHandler({ db }) {
+  return async function updateProfile(req, res, next) {
+    try {
+      const input = parseBody(profileSchema, req.body);
+      const result = await db.query(
+        `UPDATE identity.users
+         SET full_name = $2,
+             avatar_url = $3
+         WHERE id = $1 AND is_active = true
+         RETURNING ${userColumns}`,
+        [req.user.id, input.full_name, input.avatar_url || null],
       );
       if (!result.rows[0]) throw createHttpError('Invalid session', 401);
       res.json({ user: serializeUser(result.rows[0]) });

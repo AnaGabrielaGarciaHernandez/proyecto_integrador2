@@ -250,7 +250,11 @@ export default function Sidebar({ abierto, onCerrar }) {
               >
 
                 <div className="sidebar-usuario-avatar">
-                  <User size={18} color="#fff" />
+                  {usuario.avatar_url ? (
+                    <img src={usuario.avatar_url} alt={usuario.full_name} className="sidebar-usuario-avatar-img" />
+                  ) : (
+                    <User size={18} color="#fff" />
+                  )}
                 </div>
 
                 <div className="sidebar-usuario-info">

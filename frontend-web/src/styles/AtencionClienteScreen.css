@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  padding: 16px 20px 24px;
 }
 
 .atencion-hero {
@@ -9,6 +10,7 @@
   padding: 48px 40px 40px;
   display: flex;
   flex-direction: column;
+  border-radius: 20px;
 }
 
 .atencion-hero-content {
@@ -46,7 +48,7 @@
 
 .atencion-grid {
   display: grid;
-  gap: 16px;
+  gap: 18px;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
@@ -58,6 +60,7 @@
   display: flex;
   gap: 12px;
   align-items: center;
+  margin: 0;
 }
 
 .atencion-card-icono {
@@ -94,7 +97,8 @@
   background: #fff;
   border: 1px solid #e8ece8;
   border-radius: 20px;
-  padding: 22px;
+  padding: 24px;
+  margin-top: 4px;
 }
 
 .atencion-panel-header {
@@ -135,7 +139,8 @@
 .atencion-faq-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  margin-top: 4px;
 }
 
 .atencion-faq-item {
@@ -143,10 +148,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 16px;
+  padding: 16px 18px;
   border: 1px solid #eef2ee;
   border-radius: 14px;
   background: #fcfdfc;
+  margin: 0;
 }
 
 .atencion-faq-texto h3 {

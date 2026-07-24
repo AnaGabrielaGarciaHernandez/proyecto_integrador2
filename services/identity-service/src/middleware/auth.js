@@ -14,7 +14,7 @@ function createRequireAuth({ db, config, publicKey }) {
       });
       const result = await db.query(
         `SELECT u.id, u.email, u.full_name, u.auth_provider, u.role,
-                u.phone, u.bio, u.is_active, u.created_at,
+                u.phone, u.bio, u.avatar_url, u.is_active, u.created_at,
                 u.show_home_sell_banner
          FROM identity.sessions AS s
          JOIN identity.users AS u ON u.id = s.user_id

@@ -350,48 +350,6 @@ npm run build
 
 La última verificación aprobó 74 de 74 pruebas, los checks de todos los workspaces, ESLint y el build del frontend.
 
-## Problemas Comunes
-
-### `no configuration file provided: not found`
-
-La terminal no está en la raíz del repositorio. Regresa a `proyecto_integrador2` y comprueba que exista `compose.yaml`.
-
-Windows:
-
-```powershell
-Set-Location ruta\al\proyecto_integrador2
-Test-Path compose.yaml
-```
-
-macOS:
-
-```bash
-cd /ruta/al/proyecto_integrador2
-ls compose.yaml
-```
-
-### Payment responde `STRIPE_UNAVAILABLE`
-
-Revisa que `.env` contenga la clave sandbox y el secreto del listener. Después ejecuta:
-
-```text
-docker compose up -d --force-recreate payment-service
-docker compose logs --tail=100 payment-service
-```
-
-### Un puerto ya está ocupado
-
-Detén la aplicación que usa el puerto o ajusta los puertos locales en `.env`/`compose.yaml`. Los principales son `5173`, `4000`, `55432`, `5672` y `15672`.
-
-### Un servicio no aparece saludable
-
-```text
-docker compose ps
-docker compose logs --tail=150 nombre-del-servicio
-```
-
-Empieza revisando PostgreSQL, RabbitMQ y el job de migraciones de schema `migrate`.
-
 ## Alcance Actual
 
 - Recolección presencial gratuita.

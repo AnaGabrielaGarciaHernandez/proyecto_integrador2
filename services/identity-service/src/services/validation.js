@@ -1,9 +1,16 @@
 const { z } = require('zod');
 
+const registrationPasswordSchema = z.string()
+  .min(8)
+  .max(128)
+  .regex(/[A-Z]/, 'Password must contain an uppercase letter')
+  .regex(/[a-z]/, 'Password must contain a lowercase letter')
+  .regex(/[0-9]/, 'Password must contain a number');
+
 const registerSchema = z.object({
   email: z.string().email().trim().toLowerCase(),
-  full_name: z.string().trim().min(2).max(180),
-  password: z.string().min(8).max(128),
+  full_name: z.string().trim().min(2).max(50),
+  password: registrationPasswordSchema,
   phone: z.string().trim().max(30).optional(),
 }).strict();
 
@@ -25,7 +32,7 @@ const privacyDeletionSchema = z.object({
 }).strict();
 
 const profileSchema = z.object({
-  full_name: z.string().trim().min(2).max(180),
+  full_name: z.string().trim().min(2).max(50),
 }).strict();
 
 module.exports = {

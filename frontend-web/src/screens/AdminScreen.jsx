@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Users, CheckCircle, XCircle, Trash2, Shield, Activity, BarChart
@@ -22,11 +22,7 @@ export default function AdminScreen() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    fetchData()
-  }, [tab])
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -45,7 +41,13 @@ export default function AdminScreen() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [tab])
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetchData()
+    })
+  }, [fetchData])
 
   async function handleSuspendUser(id, is_active) {
     if (!window.confirm(`¿Estás seguro de ${is_active ? 'suspender' : 'activar'} a este usuario?`)) return

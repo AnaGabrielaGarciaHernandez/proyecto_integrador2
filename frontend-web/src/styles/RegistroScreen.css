@@ -32,6 +32,50 @@
   line-height: 1.5;
 }
 
+.registro-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.registro-requisitos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0 6px;
+  padding: 0;
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.35;
+  list-style: none;
+}
+
+.registro-requisito {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.18s ease;
+}
+
+.registro-requisito-icon {
+  width: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.registro-requisito.neutral {
+  color: #94a3b8;
+}
+
+.registro-requisito.pendiente {
+  color: #dc2626;
+}
+
+.registro-requisito.cumplido {
+  color: #15803d;
+}
+
 .registro-terminos a {
   color: var(--color-text);
   text-decoration: underline;
@@ -237,6 +281,13 @@
   .registro-body {
     padding: 24px 20px;
   }
+
+  .registro-requisitos {
+    gap: 4px 10px;
+    margin-left: 4px;
+    margin-right: 4px;
+  }
+
   .registro-avatar-modal {
     padding: 24px 20px;
   }

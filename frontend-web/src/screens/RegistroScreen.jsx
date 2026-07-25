@@ -13,7 +13,34 @@ import { useAuth } from '../context/useAuth'
 import { hasGoogleClientId } from '../services/googleAuth'
 import GoogleLoginButton from '../components/GoogleLoginButton'
 import { createAvatarPreview, validateAvatarFile } from '../services/avatar'
+import { getRegistrationValidation } from '../services/registration-validation'
 import '../styles/RegistroScreen.css'
+
+function RequirementList({ id, items, active }) {
+  const visibleItems = items.filter((item) => item.visible !== false)
+
+  if (visibleItems.length === 0) return null
+
+  return (
+    <ul
+      id={id}
+      className={`registro-requisitos ${active ? 'activo' : ''}`}
+      aria-live="polite"
+    >
+      {visibleItems.map((item) => {
+        const status = active ? (item.valid ? 'cumplido' : 'pendiente') : 'neutral'
+        return (
+          <li className={`registro-requisito ${status}`} key={item.id}>
+            <span className="registro-requisito-icon" aria-hidden="true">
+              {status === 'cumplido' ? '✓' : '○'}
+            </span>
+            <span>{item.label}</span>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
 
 export default function RegistroScreen() {
   const navigate = useNavigate()
@@ -30,10 +57,25 @@ export default function RegistroScreen() {
   const [toast, setToast] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
+  const [registroIntentado, setRegistroIntentado] = useState(false)
+  const [camposTocados, setCamposTocados] = useState({
+    nombre: false,
+    correo: false,
+    contrasena: false,
+  })
   const avatarInputRef = useRef(null)
   const avatarPreviewRef = useRef(null)
   const modalRef = useRef(null)
   const toastTimerRef = useRef(null)
+  const validacion = getRegistrationValidation({
+    name: nombre,
+    email: correo,
+    password: contrasena,
+  })
+  const nombreValido = validacion.name.every(({ valid }) => valid)
+  const correoValido = validacion.email.every(({ valid }) => valid)
+  const mostrarNombreRequisitos = registroIntentado && !nombreValido
+  const mostrarCorreoRequisitos = registroIntentado && !correoValido
 
   useEffect(() => () => {
     if (avatarPreviewRef.current) URL.revokeObjectURL(avatarPreviewRef.current)
@@ -71,8 +113,10 @@ export default function RegistroScreen() {
   }
 
   async function handleRegistrar() {
-    if (!nombre.trim() || !correo.trim() || !contrasena) {
-      setError('Por favor completa todos los campos.')
+    setRegistroIntentado(true)
+    setCamposTocados({ nombre: true, correo: true, contrasena: true })
+    if (!validacion.isValid) {
+      setError('Revisa los requisitos de cada campo antes de continuar.')
       return
     }
 
@@ -90,6 +134,12 @@ export default function RegistroScreen() {
     } finally {
       setCargando(false)
     }
+  }
+
+  function handleFieldChange(field, setter, value) {
+    setter(value)
+    setCamposTocados((previous) => ({ ...previous, [field]: true }))
+    if (error) setError('')
   }
 
   function handleOpenAvatarPicker() {
@@ -181,40 +231,81 @@ export default function RegistroScreen() {
         {error && <div className="login-error" role="alert">{error}</div>}
 
         <div className="login-campos">
-          <div className="input-wrapper">
-            <User size={16} />
-            <input
-              type="text"
-              placeholder="Nombre completo"
-              value={nombre}
-              onChange={(event) => setNombre(event.target.value)}
-            />
+          <div className="registro-campo">
+            <div className="input-wrapper">
+              <User size={16} />
+              <input
+                id="registro-nombre"
+                type="text"
+                placeholder="Nombre completo"
+                value={nombre}
+                onChange={(event) => handleFieldChange('nombre', setNombre, event.target.value)}
+                aria-describedby={mostrarNombreRequisitos ? 'registro-nombre-requisitos' : undefined}
+                aria-invalid={registroIntentado && !nombreValido}
+                autoComplete="name"
+              />
+            </div>
+            {mostrarNombreRequisitos && (
+              <RequirementList
+                id="registro-nombre-requisitos"
+                items={validacion.name}
+                active
+              />
+            )}
           </div>
-          <div className="input-wrapper">
-            <Mail size={16} />
-            <input
-              type="email"
-              placeholder="Correo electrónico"
-              value={correo}
-              onChange={(event) => setCorreo(event.target.value)}
-            />
+
+          <div className="registro-campo">
+            <div className="input-wrapper">
+              <Mail size={16} />
+              <input
+                id="registro-correo"
+                type="email"
+                placeholder="Correo electrónico"
+                value={correo}
+                onChange={(event) => handleFieldChange('correo', setCorreo, event.target.value)}
+                aria-describedby={mostrarCorreoRequisitos ? 'registro-correo-requisitos' : undefined}
+                aria-invalid={registroIntentado && !correoValido}
+                autoComplete="email"
+              />
+            </div>
+            {mostrarCorreoRequisitos && (
+              <RequirementList
+                id="registro-correo-requisitos"
+                items={validacion.email}
+                active
+              />
+            )}
           </div>
-          <div className="input-wrapper">
-            <Lock size={16} />
-            <input
-              type={verPass ? 'text' : 'password'}
-              placeholder="Contraseña"
-              value={contrasena}
-              onChange={(event) => setContrasena(event.target.value)}
-            />
-            <button
-              className="btn-ojo"
-              type="button"
-              onClick={() => setVerPass(!verPass)}
-              aria-label={verPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-            >
-              {verPass ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
+
+          <div className="registro-campo">
+            <div className="input-wrapper">
+              <Lock size={16} />
+              <input
+                id="registro-contrasena"
+                type={verPass ? 'text' : 'password'}
+                placeholder="Contraseña"
+                value={contrasena}
+                onChange={(event) => handleFieldChange('contrasena', setContrasena, event.target.value)}
+                aria-describedby={contrasena.length > 0 ? 'registro-contrasena-requisitos' : undefined}
+                aria-invalid={camposTocados.contrasena && !validacion.password.every(({ valid }) => valid)}
+                autoComplete="new-password"
+              />
+              <button
+                className="btn-ojo"
+                type="button"
+                onClick={() => setVerPass(!verPass)}
+                aria-label={verPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              >
+                {verPass ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {contrasena.length > 0 && (
+              <RequirementList
+                id="registro-contrasena-requisitos"
+                items={validacion.password}
+                active
+              />
+            )}
           </div>
         </div>
 

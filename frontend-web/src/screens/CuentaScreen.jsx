@@ -201,6 +201,7 @@ export default function CuentaScreen() {
                 id="full_name"
                 type="text"
                 value={nombre}
+                maxLength={50}
                 onChange={(event) => setNombreBorrador({
                   userId: usuario.id,
                   value: event.target.value,

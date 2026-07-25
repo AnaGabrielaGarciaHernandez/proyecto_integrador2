@@ -9,11 +9,13 @@ const {
 const { loadConfig } = require('./config');
 const { createApp } = require('./app');
 const { createCatalogEventHandler } = require('./events/handlers');
+const { createProductStorage } = require('./services/product-storage');
 
 async function main() {
   const config = loadConfig();
   const db = createDb({ connectionString: config.DATABASE_URL, schema: 'catalog' });
   const bus = createRabbitBus({ url: config.RABBITMQ_URL, serviceName: 'catalog-service' });
+  const storage = createProductStorage(config);
 
   await db.health();
   await bus.connect();
@@ -39,7 +41,7 @@ async function main() {
     maxRetries: 5,
   });
 
-  const app = createApp({ db, config });
+  const app = createApp({ db, config, storage });
   const server = app.listen(config.PORT, () => {
     console.log(`[catalog-service] port=${config.PORT} step=server_started`);
   });

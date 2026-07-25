@@ -280,6 +280,122 @@ function createOrdersRepository(db) {
     return toPublicOrder(normalizeOrder(result.rows[0]));
   }
 
+  async function getSellerSales(sellerUserId, input) {
+    const paidWhere = `
+      o.status IN ('paid', 'preparing', 'ready_for_pickup', 'delivered')
+      AND o.payment_status = 'succeeded'`;
+
+    const summaryResult = await db.query(
+      `SELECT
+         COALESCE(SUM(oi.total_cents) FILTER (WHERE ${paidWhere}), 0)::bigint AS total_sales_cents,
+         COUNT(DISTINCT o.id) FILTER (WHERE ${paidWhere})::integer AS paid_orders_count,
+         COALESCE(SUM(oi.quantity) FILTER (WHERE ${paidWhere}), 0)::integer AS units_sold,
+         COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'cancelled')::integer AS cancelled_orders_count,
+         COUNT(DISTINCT o.id) FILTER (
+           WHERE o.status = 'refunded' OR o.payment_status = 'refunded'
+         )::integer AS refunded_orders_count
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id
+         AND oi.seller_user_id = $1`,
+      [sellerUserId],
+    );
+
+    const productSalesResult = await db.query(
+      `SELECT oi.product_id,
+              oi.product_name,
+              COALESCE(SUM(oi.quantity) FILTER (WHERE ${paidWhere}), 0)::integer AS units_sold,
+              COALESCE(SUM(oi.total_cents) FILTER (WHERE ${paidWhere}), 0)::bigint AS sales_cents
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id
+         AND oi.seller_user_id = $1
+       GROUP BY oi.product_id, oi.product_name
+       HAVING COUNT(*) FILTER (WHERE ${paidWhere}) > 0
+       ORDER BY sales_cents DESC, oi.product_name
+       LIMIT 100`,
+      [sellerUserId],
+    );
+
+    const searchPattern = `%${input.search}%`;
+    const ordersResult = await db.query(
+      `SELECT o.id, o.order_number, o.buyer_id, o.buyer_name, o.status,
+              o.payment_status, o.currency, o.created_at, o.updated_at,
+              o.paid_at, o.cancelled_at,
+              count(oi.id)::integer AS item_count,
+              sum(oi.total_cents)::integer AS seller_total_cents,
+              COALESCE(jsonb_agg(
+                jsonb_build_object(
+                  'id', oi.id,
+                  'variant_id', oi.variant_id,
+                  'product_id', oi.product_id,
+                  'product_name', oi.product_name,
+                  'size_name', oi.size_name,
+                  'quantity', oi.quantity,
+                  'unit_price_cents', oi.unit_price_cents,
+                  'total_cents', oi.total_cents,
+                  'image_url', oi.cover_image,
+                  'created_at', oi.created_at
+                ) ORDER BY oi.created_at
+              ), '[]'::jsonb) AS items
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id
+         AND oi.seller_user_id = $1
+       WHERE (
+         $2 = ''
+         OR lower(o.id::text) LIKE lower($3)
+         OR lower(o.order_number) LIKE lower($3)
+         OR lower(o.buyer_name) LIKE lower($3)
+         OR lower(o.buyer_id::text) LIKE lower($3)
+         OR lower(oi.product_name) LIKE lower($3)
+       )
+       GROUP BY o.id
+       ORDER BY o.created_at DESC, o.id DESC
+       LIMIT $4 OFFSET $5`,
+      [sellerUserId, input.search, searchPattern, input.limit, input.offset],
+    );
+
+    const totalResult = await db.query(
+      `SELECT count(DISTINCT o.id)::integer AS total
+       FROM orders o
+       JOIN order_items oi ON oi.order_id = o.id
+         AND oi.seller_user_id = $1
+       WHERE (
+         $2 = ''
+         OR lower(o.id::text) LIKE lower($3)
+         OR lower(o.order_number) LIKE lower($3)
+         OR lower(o.buyer_name) LIKE lower($3)
+         OR lower(o.buyer_id::text) LIKE lower($3)
+         OR lower(oi.product_name) LIKE lower($3)
+       )`,
+      [sellerUserId, input.search, searchPattern],
+    );
+
+    const summary = summaryResult.rows[0] || {};
+    const orders = ordersResult.rows.map((row) => normalizeOrder(row));
+    const total = Number(totalResult.rows[0]?.total || 0);
+    return {
+      summary: {
+        total_sales_cents: Number(summary.total_sales_cents || 0),
+        paid_orders_count: Number(summary.paid_orders_count || 0),
+        units_sold: Number(summary.units_sold || 0),
+        cancelled_orders_count: Number(summary.cancelled_orders_count || 0),
+        refunded_orders_count: Number(summary.refunded_orders_count || 0),
+      },
+      product_sales: productSalesResult.rows.map((row) => ({
+        product_id: row.product_id,
+        product_name: row.product_name,
+        units_sold: Number(row.units_sold || 0),
+        sales_cents: Number(row.sales_cents || 0),
+      })),
+      orders,
+      total,
+      pagination: {
+        limit: input.limit,
+        offset: input.offset,
+        has_more: input.offset + orders.length < total,
+      },
+    };
+  }
+
   async function listPendingCompensations(limit = 20) {
     const result = await db.query(
       `SELECT o.id, s.correlation_id, s.last_error
@@ -342,6 +458,7 @@ function createOrdersRepository(db) {
     getBuyerOrder,
     getSellerOrders,
     getSellerOrder,
+    getSellerSales,
     listPendingCompensations,
     listExpiredPendingCheckouts,
     countPendingCompensations,

@@ -11,6 +11,7 @@ import {
   Package,
   BarChart2,
   Heart,
+  Store,
 } from 'lucide-react'
 
 import { contarItems } from '../services/carrito'
@@ -199,6 +200,19 @@ export default function Sidebar({ abierto, onCerrar }) {
             >
               <Tag size={15} />
               Publicar prenda
+            </NavLink>
+          )}
+
+          {usuario?.role === 'vendedor' && (
+            <NavLink
+              to="/panel-vendedor"
+              onClick={onCerrar}
+              className={({ isActive }) =>
+                isActive ? 'nav-item nav-item-sm active' : 'nav-item nav-item-sm'
+              }
+            >
+              <Store size={15} />
+              Panel de vendedor
             </NavLink>
           )}
 

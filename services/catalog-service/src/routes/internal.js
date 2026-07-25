@@ -19,7 +19,7 @@ const SellerApplicationReviewSchema = z.object({
   rejection_reason: z.string().trim().max(2000).optional(),
 });
 
-function createInternalRouter({ db, internalToken }) {
+function createInternalRouter({ db, internalToken, storage }) {
   const router = express.Router();
   router.use(requireInternalToken(internalToken));
 
@@ -197,6 +197,7 @@ function createInternalRouter({ db, internalToken }) {
   router.post('/privacy/users/:userId/anonymize', async (req, res, next) => {
     try {
       const userId = parse(UserIdSchema, req.params.userId);
+      let objectKeys = [];
       const result = await db.transaction(async (client) => {
         const buyerReservations = await client.query(
           `SELECT order_id
@@ -233,10 +234,26 @@ function createInternalRouter({ db, internalToken }) {
         const sellerIds = sellerProfiles.rows.map((row) => row.id);
 
         if (sellerIds.length > 0) {
+          const images = await client.query(
+            `SELECT f.object_key
+             FROM catalog.product_images pi
+             JOIN catalog.files f ON f.id = pi.file_id
+             JOIN catalog.products p ON p.id = pi.product_id
+             WHERE p.seller_id = ANY($1::uuid[])`,
+            [sellerIds],
+          );
+          objectKeys = images.rows.map((row) => row.object_key);
           await client.query(
             `UPDATE catalog.products
              SET status = 'removed', removed_at = COALESCE(removed_at, now()), updated_at = now()
              WHERE seller_id = ANY($1::uuid[])`,
+            [sellerIds],
+          );
+          await client.query(
+            `DELETE FROM catalog.product_images pi
+             USING catalog.products p
+             WHERE pi.product_id = p.id
+               AND p.seller_id = ANY($1::uuid[])`,
             [sellerIds],
           );
           await client.query(
@@ -285,6 +302,13 @@ function createInternalRouter({ db, internalToken }) {
           deleted_wishlist_items: true,
         };
       });
+      if (storage && objectKeys.length > 0) {
+        try {
+          await storage.remove(objectKeys);
+        } catch (error) {
+          console.warn('[catalog-service] privacy product image cleanup failed', error.details?.code || error.message);
+        }
+      }
       res.json({ service: 'catalog', status: 'completed', result });
     } catch (error) {
       next(error);

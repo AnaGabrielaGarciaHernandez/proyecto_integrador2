@@ -12,8 +12,9 @@ const { createInternalRouter } = require('./routes/internal');
 const { createSellerRouter } = require('./routes/seller');
 const { createSellerApplicationsRouter } = require('./routes/seller-applications');
 const { createWishlistRouter } = require('./routes/wishlist');
+const { createCategoriesRouter } = require('./routes/categories');
 
-function createApp({ db, config }) {
+function createApp({ db, config, storage }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(correlationMiddleware('catalog-service'));
@@ -41,11 +42,21 @@ function createApp({ db, config }) {
     }
   });
 
+  app.use('/api/categories', createCategoriesRouter(db));
   app.use('/api/products', createProductsRouter(db));
   app.use('/api/wishlist', createWishlistRouter(db, { mutationRateLimit }));
   app.use('/api/seller-applications', createSellerApplicationsRouter(db, { mutationRateLimit }));
-  app.use('/api/seller', createSellerRouter());
-  app.use('/internal', createInternalRouter({ db, internalToken: config.INTERNAL_SERVICE_TOKEN }));
+  app.use('/api/seller', createSellerRouter({
+    db,
+    config,
+    storage,
+    mutationRateLimit,
+  }));
+  app.use('/internal', createInternalRouter({
+    db,
+    internalToken: config.INTERNAL_SERVICE_TOKEN,
+    storage,
+  }));
   app.use(notFound);
   app.use(errorHandler);
   return app;

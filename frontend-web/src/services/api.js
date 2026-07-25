@@ -33,6 +33,9 @@ const PUBLIC_ERROR_MESSAGES = {
   PRIVACY_EXPORT_UNAVAILABLE: 'La exportación no está disponible por el momento.',
   PRIVACY_DELETION_UNAVAILABLE: 'La eliminación no está disponible por el momento.',
   PRIVACY_SERVICE_UNAVAILABLE: 'No pudimos consultar todos tus datos por el momento.',
+  PRODUCT_STORAGE_UNAVAILABLE: 'No pudimos guardar las imágenes por el momento. Inténtalo de nuevo.',
+  PRODUCT_IMAGE_OUTPUT_TOO_LARGE: 'Una de las imágenes es demasiado pesada después de procesarla.',
+  PRODUCT_IMAGE_COUNT_EXCEEDED: 'Una publicación puede tener hasta 8 imágenes.',
   USER_DELETION_PENDING: 'Esta cuenta tiene una eliminación pendiente y no puede modificarse.',
   SELLER_APPLICATION_PENDING: 'Ya tienes una solicitud de vendedor en revisión.',
   SELLER_APPLICATION_ALREADY_REVIEWED: 'Esta cuenta ya tiene una solicitud aprobada o suspendida.',
@@ -93,7 +96,7 @@ export function get(path) {
 export function post(path, body) {
   return request(path, {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: isFormData(body) ? body : JSON.stringify(body),
   })
 }
 

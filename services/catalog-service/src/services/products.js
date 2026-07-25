@@ -91,7 +91,7 @@ async function resolveVariants(db, variantIds, buyerId = null) {
        SELECT json_build_object(
          'id', pi.id,
          'file_id', f.id,
-         'url', '/' || f.bucket || '/' || f.object_key,
+         'url', COALESCE(f.public_url, '/' || f.bucket || '/' || f.object_key),
          'mime_type', f.mime_type
        ) AS cover_image
        FROM product_images pi
@@ -174,7 +174,7 @@ function productSelect({ detail = false, userIdParameter = null } = {}) {
       json_build_object(
         'id', pi.id,
         'file_id', f.id,
-        'url', '/' || f.bucket || '/' || f.object_key,
+        'url', COALESCE(f.public_url, '/' || f.bucket || '/' || f.object_key),
         'mime_type', f.mime_type,
         'sort_order', pi.sort_order,
         'is_cover', pi.is_cover

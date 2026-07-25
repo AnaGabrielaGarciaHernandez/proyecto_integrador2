@@ -10,6 +10,7 @@ import ProductoScreen from '../screens/ProductoScreen'
 import LoginScreen    from '../screens/LoginScreen'
 import RegistroScreen from '../screens/RegistroScreen'
 import VenderScreen   from '../screens/VenderScreen'
+import PanelVendedorScreen from '../screens/PanelVendedorScreen'
 import AdminScreen from '../screens/AdminScreen'
 import OrdersScreen from '../screens/OrdersScreen'
 import AtencionClienteScreen from '../screens/AtencionClienteScreen'
@@ -34,6 +35,7 @@ export default function AppRouter() {
         <Route path="/login"        element={<LoginScreen />} />
         <Route path="/registro"     element={<RegistroScreen />} />
         <Route path="/vender"       element={<VenderScreen />} />
+        <Route path="/panel-vendedor" element={<PanelVendedorScreen />} />
         <Route path="/soporte"      element={<AtencionClienteScreen />} />
         <Route path="/privacidad"  element={<PrivacidadScreen />} />
         <Route element={<AdminRoute />}>

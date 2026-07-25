@@ -98,6 +98,15 @@ function createApp({ db, orders, checkoutService }) {
     }
   });
 
+  app.get('/api/seller/sales', requireUser, requireRole('vendedor', 'admin'), async (req, res, next) => {
+    try {
+      const input = parseSalesQuery(req.query);
+      res.json(await orders.getSellerSales(req.user.id, input));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get('/api/seller/orders/:id', requireUser, requireRole('vendedor', 'admin'), async (req, res, next) => {
     try {
       res.json({ order: await orders.getSellerOrder(ensureUuid(req.params.id), req.user.id) });
@@ -126,4 +135,19 @@ function validationError(error, req, res, next) {
   return next(error);
 }
 
-module.exports = { createApp };
+function parseSalesQuery(query) {
+  const search = typeof query.search === 'string' ? query.search.trim() : '';
+  const limit = query.limit === undefined ? 25 : Number(query.limit);
+  const offset = query.offset === undefined ? 0 : Number(query.offset);
+  if (search.length > 120
+    || !Number.isInteger(limit) || limit < 1 || limit > 100
+    || !Number.isInteger(offset) || offset < 0) {
+    throw Object.assign(new Error('Invalid sales query'), {
+      status: 400,
+      details: { code: 'INVALID_REQUEST' },
+    });
+  }
+  return { search, limit, offset };
+}
+
+module.exports = { createApp, parseSalesQuery };

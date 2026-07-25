@@ -119,7 +119,14 @@ export function AuthProvider({ children }) {
       throw new Error('Debes iniciar sesión para editar tu perfil.')
     }
 
-    const data = await patch('/auth/profile', profile)
+    let payload = profile
+    if (profile?.avatar) {
+      payload = new FormData()
+      payload.append('full_name', profile.full_name)
+      payload.append('avatar', profile.avatar)
+    }
+
+    const data = await patch('/auth/profile', payload)
     userRef.current = data.user
     setUser(data.user)
     window.dispatchEvent(new Event('authActualizado'))

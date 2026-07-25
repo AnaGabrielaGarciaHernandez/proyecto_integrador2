@@ -485,6 +485,12 @@ El archivo raíz `.env` se crea a partir de `.env.example` y es consumido por Co
 | `COOKIE_NAME` | Nombre de cookie de sesión |
 | `CLIENT_ORIGIN` | Origen permitido por CORS y URLs de Checkout |
 | `GOOGLE_CLIENT_ID` | Login Google opcional |
+| `SUPABASE_URL` | URL del proyecto Supabase; sólo `identity-service` |
+| `SUPABASE_SERVER_KEY` | Clave privada de servidor para Storage; nunca frontend |
+| `SUPABASE_AVATAR_BUCKET` | Bucket público de avatares, por defecto `avatars` |
+| `AVATAR_MAX_INPUT_BYTES` / `AVATAR_MAX_OUTPUT_BYTES` | Límites de entrada (5 MB) y salida (300 KB) |
+| `AVATAR_OUTPUT_SIZE` / `AVATAR_MAX_PIXELS` | Tamaño final (256 px) y límite de píxeles (16 MP) |
+| `AVATAR_RATE_LIMIT_MAX` / `AVATAR_RATE_LIMIT_WINDOW_MS` | Intentos de avatar por usuario y ventana temporal |
 | `STRIPE_SECRET_KEY` | Clave sandbox de Payment; preferentemente restringida |
 | `STRIPE_WEBHOOK_SECRET` | Secreto de firma del listener o endpoint Stripe |
 

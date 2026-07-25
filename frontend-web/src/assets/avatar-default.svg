@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Avatar predeterminado</title>
+  <desc id="desc">Silueta de una persona</desc>
+  <rect width="128" height="128" rx="64" fill="#DDEDE3" />
+  <circle cx="64" cy="45" r="22" fill="#52B788" />
+  <path d="M25 112c3.5-22.5 19-35 39-35s35.5 12.5 39 35H25Z" fill="#52B788" />
+  <path d="M38 91c7.2-7.8 15.6-11.5 26-11.5S82.8 83.2 90 91c-7.2 5.5-16 8.5-26 8.5S45.2 96.5 38 91Z" fill="#3A8E64" opacity=".45" />
+</svg>

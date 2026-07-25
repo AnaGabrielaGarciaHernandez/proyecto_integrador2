@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
   Package, Heart, MapPin,
@@ -7,24 +7,38 @@ import {
   Pencil
 } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
+import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { createAvatarPreview, validateAvatarFile } from '../services/avatar'
 import '../styles/CuentaScreen.css'
-
-const DEFAULT_AVATAR_URL = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80'
 
 export default function CuentaScreen() {
   const navigate = useNavigate()
   const { user: usuario, logout, updateProfile } = useAuth()
-  const [nombre, setNombre] = useState(usuario?.full_name || '')
-  const [avatarUrl, setAvatarUrl] = useState(usuario?.avatar_url || DEFAULT_AVATAR_URL)
+  const [nombreBorrador, setNombreBorrador] = useState({ userId: null, value: null })
+  const [nuevaFoto, setNuevaFoto] = useState({ userId: null, file: null, url: null })
+  const previewUrlRef = useRef(null)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const [mensaje, setMensaje] = useState('')
   const [mostrarEditor, setMostrarEditor] = useState(false)
 
-  useEffect(() => {
-    setNombre(usuario?.full_name || '')
-    setAvatarUrl(usuario?.avatar_url || DEFAULT_AVATAR_URL)
-  }, [usuario?.full_name, usuario?.avatar_url])
+  const nombre = nombreBorrador.userId === usuario?.id && nombreBorrador.value !== null
+    ? nombreBorrador.value
+    : usuario?.full_name || ''
+  const nuevaFotoUrl = nuevaFoto.userId === usuario?.id ? nuevaFoto.url : null
+  const nuevaFotoFile = nuevaFoto.userId === usuario?.id ? nuevaFoto.file : null
+
+  useEffect(() => () => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+  }, [])
+
+  function limpiarNuevaFoto() {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current)
+      previewUrlRef.current = null
+    }
+    setNuevaFoto({ userId: usuario?.id || null, file: null, url: null })
+  }
 
   async function handleCerrarSesion() {
     await logout()
@@ -43,11 +57,15 @@ export default function CuentaScreen() {
 
     try {
       setGuardando(true)
-      await updateProfile({
+      const profile = {
         full_name: nombre.trim(),
-        avatar_url: avatarUrl.trim() || DEFAULT_AVATAR_URL,
-      })
+      }
+      if (nuevaFotoFile) profile.avatar = nuevaFotoFile
+
+      const updatedUser = await updateProfile(profile)
       setMensaje('Tu perfil se actualizó correctamente.')
+      setNombreBorrador({ userId: updatedUser.id, value: null })
+      limpiarNuevaFoto()
       setMostrarEditor(false)
     } catch (err) {
       setError(err.message || 'No se pudo guardar tu perfil.')
@@ -56,18 +74,26 @@ export default function CuentaScreen() {
     }
   }
 
-  function handleArchivoSeleccionado(event) {
+  async function handleArchivoSeleccionado(event) {
     const archivo = event.target.files?.[0]
     if (!archivo) return
 
-    const lector = new FileReader()
-    lector.onload = () => {
-      setAvatarUrl(String(lector.result))
+    setError('')
+    try {
+      const file = validateAvatarFile(archivo)
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+      const previewUrl = createAvatarPreview(file)
+      previewUrlRef.current = previewUrl
+      setNuevaFoto({
+        userId: usuario.id,
+        file,
+        url: previewUrl,
+      })
+    } catch (err) {
+      setError(err.message || 'No se pudo leer la foto seleccionada.')
+    } finally {
+      event.target.value = ''
     }
-    lector.onerror = () => {
-      setError('No se pudo leer la foto seleccionada.')
-    }
-    lector.readAsDataURL(archivo)
   }
 
   if (!usuario) {
@@ -125,7 +151,10 @@ export default function CuentaScreen() {
                 id="full_name"
                 type="text"
                 value={nombre}
-                onChange={(event) => setNombre(event.target.value)}
+                onChange={(event) => setNombreBorrador({
+                  userId: usuario.id,
+                  value: event.target.value,
+                })}
               />
             </div>
 
@@ -134,14 +163,14 @@ export default function CuentaScreen() {
               <input
                 id="avatar_file"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleArchivoSeleccionado}
               />
             </div>
 
-            {avatarUrl && (
+            {nuevaFotoUrl && (
               <div className="cuenta-preview-avatar">
-                <img src={avatarUrl} alt="Vista previa del perfil" />
+                <img src={nuevaFotoUrl} alt="Vista previa de la nueva foto" />
               </div>
             )}
 
@@ -159,8 +188,8 @@ export default function CuentaScreen() {
                   setMostrarEditor(false)
                   setError('')
                   setMensaje('')
-                  setNombre(usuario?.full_name || '')
-                  setAvatarUrl(usuario?.avatar_url || DEFAULT_AVATAR_URL)
+                  setNombreBorrador({ userId: usuario.id, value: null })
+                  limpiarNuevaFoto()
                 }}
               >
                 Cancelar

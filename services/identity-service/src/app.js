@@ -12,8 +12,9 @@ const { createRequireAuth } = require('./middleware/auth');
 const { createRequireInternalToken } = require('./middleware/internal');
 const { createAuthRouter } = require('./routes/auth.routes');
 const { createInternalRouter } = require('./routes/internal.routes');
+const { createAvatarStorage } = require('./services/avatar-storage');
 
-function createApp({ db, config, privateKey, googleClient } = {}) {
+function createApp({ db, config, privateKey, googleClient, avatarStorage } = {}) {
   if (!db || !config || !privateKey) {
     throw new Error('createApp requires db, config and privateKey');
   }
@@ -23,6 +24,9 @@ function createApp({ db, config, privateKey, googleClient } = {}) {
   const requireInternalToken = createRequireInternalToken(
     [config.INTERNAL_SERVICE_TOKENS, config.INTERNAL_SERVICE_TOKEN].filter(Boolean).join(','),
   );
+  const resolvedAvatarStorage = avatarStorage === undefined
+    ? createAvatarStorage(config)
+    : avatarStorage;
 
   const app = express();
   app.disable('x-powered-by');
@@ -53,6 +57,7 @@ function createApp({ db, config, privateKey, googleClient } = {}) {
     publicKey,
     googleClient: oauthClient,
     requireAuth,
+    avatarStorage: resolvedAvatarStorage,
   }));
   app.use('/internal', createInternalRouter({ db, requireInternalToken }));
 

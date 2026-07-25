@@ -1,11 +1,17 @@
 const { z } = require('zod');
 
+const MAX_AVATAR_URL_LENGTH = 200000;
+const registerAvatarUrlSchema = z.string()
+  .trim()
+  .max(MAX_AVATAR_URL_LENGTH)
+  .refine((value) => !/^data:/i.test(value), 'Base64 avatar URLs are not accepted');
+
 const registerSchema = z.object({
   email: z.string().email().trim().toLowerCase(),
   full_name: z.string().trim().min(2).max(180),
   password: z.string().min(8).max(128),
   phone: z.string().trim().max(30).optional(),
-  avatar_url: z.string().trim().max(20000).optional().nullable(),
+  avatar_url: registerAvatarUrlSchema.optional().nullable(),
 });
 
 const loginSchema = z.object({
@@ -23,12 +29,12 @@ const preferencesSchema = z.object({
 
 const profileSchema = z.object({
   full_name: z.string().trim().min(2).max(180),
-  avatar_url: z.string().trim().max(20000).optional().nullable(),
-});
+}).strict();
 
 module.exports = {
   googleSchema,
   loginSchema,
+  MAX_AVATAR_URL_LENGTH,
   preferencesSchema,
   profileSchema,
   registerSchema,

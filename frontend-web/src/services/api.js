@@ -30,14 +30,16 @@ const PUBLIC_ERROR_MESSAGES = {
 
 async function request(path, options = {}) {
   let response
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
+  const headers = {
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(options.headers || {}),
+  }
   try {
     response = await fetch(`${API_URL}${path}`, {
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
       ...options,
+      headers,
     })
   } catch {
     throw new ApiError(PUBLIC_ERROR_MESSAGES.NETWORK_ERROR, 0, {
@@ -88,8 +90,12 @@ export function post(path, body) {
 export function patch(path, body) {
   return request(path, {
     method: 'PATCH',
-    body: JSON.stringify(body),
+    body: isFormData(body) ? body : JSON.stringify(body),
   })
+}
+
+function isFormData(value) {
+  return typeof FormData !== 'undefined' && value instanceof FormData
 }
 
 export function put(path, body) {

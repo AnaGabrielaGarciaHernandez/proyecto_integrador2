@@ -18,12 +18,15 @@
   "dependencies": {
     "@ecobazar/contracts": "*",
     "@ecobazar/platform": "*",
+    "@supabase/supabase-js": "^2.110.8",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "google-auth-library": "^10.9.0",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "sharp": "^0.35.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {

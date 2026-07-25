@@ -1,8 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { generateKeyPairSync, randomUUID } = require('node:crypto');
+const multer = require('multer');
 const { createRequireAuth } = require('../src/middleware/auth');
-const { createUpdatePreferencesHandler } = require('../src/routes/auth.routes');
+const {
+  createUpdatePreferencesHandler,
+  createUpdateProfileHandler,
+  normalizeMultipartError,
+} = require('../src/routes/auth.routes');
 const { createSessionToken } = require('../src/services/session');
 
 const keys = createKeys();
@@ -84,6 +89,112 @@ test('preferences handler updates only the authenticated user and returns a safe
   );
 });
 
+test('profile handler preserves the current avatar when no new avatar is submitted', async () => {
+  const harness = createDbHarness();
+  const user = harness.users[0];
+  const handler = createUpdateProfileHandler({ db: harness.db });
+
+  const { error, res } = await runHandler(handler, {
+    body: { full_name: 'Nombre actualizado' },
+    user,
+  });
+
+  assert.equal(error, undefined);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.user.full_name, 'Nombre actualizado');
+  assert.equal(res.body.user.avatar_url, user.avatar_url);
+  assert.deepEqual(
+    harness.calls.at(-1).params,
+    [user.id, 'Nombre actualizado'],
+  );
+  assert.doesNotMatch(harness.calls.at(-1).text, /avatar_url\s*=/i);
+});
+
+test('profile handler stores the URL returned by avatar storage for a multipart file', async () => {
+  const harness = createDbHarness();
+  const user = harness.users[0];
+  const uploaded = [];
+  const removed = [];
+  const avatarUrl = 'https://project.supabase.co/storage/v1/object/public/avatars/avatars/'
+    + `${user.id}/new-avatar.webp`;
+  const handler = createUpdateProfileHandler({
+    db: harness.db,
+    processAvatar: async (file) => {
+      assert.equal(file.mimetype, 'image/jpeg');
+      return { buffer: Buffer.from('normalized-webp') };
+    },
+    avatarStorage: {
+      async uploadAvatar(input) {
+        uploaded.push(input);
+        return { path: `avatars/${user.id}/new-avatar.webp`, publicUrl: avatarUrl };
+      },
+      async deleteOwnedAvatar(url, userId) {
+        removed.push({ url, userId });
+      },
+      async deleteAvatar(path) {
+        removed.push({ path });
+      },
+    },
+  });
+
+  const { error, res } = await runHandler(handler, {
+    body: { full_name: user.full_name },
+    user,
+    file: { mimetype: 'image/jpeg', buffer: Buffer.from('original') },
+  });
+
+  assert.equal(error, undefined);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.user.avatar_url, avatarUrl);
+  assert.deepEqual(uploaded, [{ userId: user.id, buffer: Buffer.from('normalized-webp') }]);
+  assert.deepEqual(removed, [{ url: user.avatar_url, userId: user.id }]);
+  assert.deepEqual(
+    harness.calls.at(-1).params,
+    [user.id, user.full_name, avatarUrl],
+  );
+});
+
+test('profile handler removes a newly uploaded avatar when the database update fails', async () => {
+  const harness = createDbHarness();
+  const user = harness.users[0];
+  const removed = [];
+  harness.db.failProfileUpdate = true;
+  const handler = createUpdateProfileHandler({
+    db: harness.db,
+    processAvatar: async () => ({ buffer: Buffer.from('normalized-webp') }),
+    avatarStorage: {
+      async uploadAvatar() {
+        return { path: `avatars/${user.id}/new-avatar.webp`, publicUrl: 'https://supabase.test/new' };
+      },
+      async deleteAvatar(path) {
+        removed.push(path);
+      },
+    },
+  });
+
+  const { error } = await runHandler(handler, {
+    body: { full_name: user.full_name },
+    user,
+    file: { mimetype: 'image/png', buffer: Buffer.from('original') },
+  });
+
+  assert.match(error.message, /database update failed/i);
+  assert.deepEqual(removed, [`avatars/${user.id}/new-avatar.webp`]);
+});
+
+test('multipart errors expose a safe reason for the rejected shape', () => {
+  const unexpectedField = normalizeMultipartError(
+    new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'avatar_url'),
+  );
+  assert.equal(unexpectedField.status, 400);
+  assert.equal(unexpectedField.message, 'El archivo debe enviarse en el campo avatar.');
+  assert.equal(unexpectedField.details.code, 'AVATAR_MULTIPART_FILE_INVALID');
+
+  const tooManyParts = normalizeMultipartError(new multer.MulterError('LIMIT_PART_COUNT'));
+  assert.equal(tooManyParts.message, 'La petición de avatar solo puede contener full_name y un archivo avatar.');
+  assert.equal(tooManyParts.details.code, 'AVATAR_MULTIPART_PART_COUNT');
+});
+
 function createDbHarness() {
   const users = [createUser('one@example.com'), createUser('two@example.com')];
   const sessions = new Map(users.map((user) => [randomUUID(), user.id]));
@@ -102,12 +213,22 @@ function createDbHarness() {
         user.show_home_sell_banner = params[1];
         return { rows: [{ ...user }] };
       }
+      if (/UPDATE identity\.users[\s\S]+SET full_name/i.test(text)) {
+        if (this.failProfileUpdate) throw new Error('Database update failed');
+        const user = users.find(({ id }) => id === params[0]);
+        if (!user?.is_active) return { rows: [] };
+        user.full_name = params[1];
+        if (params.length === 3) user.avatar_url = params[2];
+        return { rows: [{ ...user }] };
+      }
       throw new Error(`Unexpected query in preference test: ${text}`);
     },
     async transaction() {
       throw new Error('Preference updates must not start a transaction');
     },
   };
+
+  db.failProfileUpdate = false;
 
   return {
     calls,
@@ -135,6 +256,7 @@ function createUser(email) {
     role: 'cliente',
     phone: null,
     bio: null,
+    avatar_url: 'https://example.com/current-avatar.jpg',
     is_active: true,
     created_at: new Date().toISOString(),
     show_home_sell_banner: true,

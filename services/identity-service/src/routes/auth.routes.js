@@ -1,5 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const multer = require('multer');
 const { EVENT_TYPES } = require('@ecobazar/contracts');
 const { createEvent, createHttpError, insertOutbox } = require('@ecobazar/platform');
 const {
@@ -17,13 +18,28 @@ const {
   profileSchema,
   registerSchema,
 } = require('../services/validation');
+const {
+  AVATAR_ALLOWED_MIME_TYPES,
+  createAvatarProcessor,
+} = require('../services/avatar');
+const { createAvatarRateLimiter } = require('../services/avatar-rate-limit');
 
 const userColumns = `
   id, email, full_name, password_hash, auth_provider, role,
   phone, bio, avatar_url, is_active, created_at, show_home_sell_banner
 `;
 
-function createAuthRouter({ db, config, privateKey, publicKey, googleClient, requireAuth }) {
+function createAuthRouter({
+  db,
+  config,
+  privateKey,
+  publicKey,
+  googleClient,
+  requireAuth,
+  avatarStorage = null,
+  avatarProcessor,
+  avatarRateLimiter,
+} = {}) {
   const router = express.Router();
   const tokenOptions = {
     privateKey,
@@ -31,6 +47,15 @@ function createAuthRouter({ db, config, privateKey, publicKey, googleClient, req
     audience: config.JWT_AUDIENCE,
     expiresIn: config.JWT_EXPIRES_IN,
   };
+  const processAvatar = avatarProcessor || createAvatarProcessor(config);
+  const rateLimiter = avatarRateLimiter || createAvatarRateLimiter({
+    maxAttempts: config.AVATAR_RATE_LIMIT_MAX,
+    windowMs: config.AVATAR_RATE_LIMIT_WINDOW_MS,
+  });
+  const profileUpload = createProfileUploadMiddleware({
+    config,
+    rateLimiter,
+  });
 
   router.post('/register', async (req, res, next) => {
     try {
@@ -128,7 +153,12 @@ function createAuthRouter({ db, config, privateKey, publicKey, googleClient, req
   });
 
   router.patch('/preferences', requireAuth, createUpdatePreferencesHandler({ db }));
-  router.patch('/profile', requireAuth, createUpdateProfileHandler({ db }));
+  router.patch(
+    '/profile',
+    requireAuth,
+    profileUpload,
+    createUpdateProfileHandler({ db, avatarStorage, processAvatar }),
+  );
 
   router.post('/google', async (req, res, next) => {
     try {
@@ -186,24 +216,203 @@ function createUpdatePreferencesHandler({ db }) {
   };
 }
 
-function createUpdateProfileHandler({ db }) {
+function createUpdateProfileHandler({
+  db,
+  avatarStorage = null,
+  processAvatar = createAvatarProcessor(),
+  logger = console,
+} = {}) {
   return async function updateProfile(req, res, next) {
+    let uploadedAvatar;
     try {
       const input = parseBody(profileSchema, req.body);
+      const hasAvatarUpdate = Boolean(req.file);
+      let avatarUrl;
+
+      if (hasAvatarUpdate) {
+        if (!avatarStorage) {
+          throw createHttpError(
+            'El almacenamiento de avatares no está configurado.',
+            503,
+            { code: 'AVATAR_STORAGE_NOT_CONFIGURED' },
+          );
+        }
+        const optimized = await processAvatar(req.file);
+        uploadedAvatar = await avatarStorage.uploadAvatar({
+          userId: req.user.id,
+          buffer: optimized.buffer,
+        });
+        avatarUrl = uploadedAvatar.publicUrl;
+      }
+
+      const update = hasAvatarUpdate
+        ? {
+          text: `UPDATE identity.users
+           SET full_name = $2,
+               avatar_url = $3
+           WHERE id = $1 AND is_active = true
+           RETURNING ${userColumns}`,
+          params: [req.user.id, input.full_name, avatarUrl],
+        }
+        : {
+          text: `UPDATE identity.users
+           SET full_name = $2
+           WHERE id = $1 AND is_active = true
+           RETURNING ${userColumns}`,
+          params: [req.user.id, input.full_name],
+        };
       const result = await db.query(
-        `UPDATE identity.users
-         SET full_name = $2,
-             avatar_url = $3
-         WHERE id = $1 AND is_active = true
-         RETURNING ${userColumns}`,
-        [req.user.id, input.full_name, input.avatar_url || null],
+        update.text,
+        update.params,
       );
       if (!result.rows[0]) throw createHttpError('Invalid session', 401);
+
+      if (uploadedAvatar && req.user.avatar_url && avatarStorage.deleteOwnedAvatar) {
+        try {
+          await avatarStorage.deleteOwnedAvatar(req.user.avatar_url, req.user.id);
+        } catch (error) {
+          logAvatarFailure(logger, req, error, 'old_avatar_cleanup_failed');
+        }
+      }
+
       res.json({ user: serializeUser(result.rows[0]) });
     } catch (error) {
+      if (uploadedAvatar && avatarStorage?.deleteAvatar) {
+        try {
+          await avatarStorage.deleteAvatar(uploadedAvatar.path);
+        } catch (cleanupError) {
+          logAvatarFailure(logger, req, cleanupError, 'new_avatar_compensation_failed');
+        }
+      }
+      if (req.file || isMultipartRequest(req) || error.details?.code?.startsWith('AVATAR_')) {
+        logAvatarFailure(logger, req, error, 'avatar_upload_failed');
+      }
       next(error);
     }
   };
+}
+
+function createProfileUploadMiddleware({ config = {}, rateLimiter } = {}) {
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: config.AVATAR_MAX_INPUT_BYTES || 5 * 1024 * 1024,
+      files: 1,
+      fields: 1,
+      // Busboy emits its partsLimit event as soon as the configured count is
+      // reached, so keep one spare part while files/fields remain strictly capped.
+      parts: 3,
+      fieldNameSize: 50,
+      fieldSize: 1024,
+    },
+    fileFilter(req, file, callback) {
+      if (!AVATAR_ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+        callback(createHttpError(
+          'El avatar debe ser JPEG, PNG o WebP.',
+          415,
+          { code: 'AVATAR_TYPE_NOT_ALLOWED' },
+        ));
+        return;
+      }
+      callback(null, true);
+    },
+  });
+
+  return function parseProfileRequest(req, res, next) {
+    if (req.is?.('application/json')) return next();
+    if (!req.is?.('multipart/form-data')) {
+      const error = createHttpError(
+        'El perfil debe enviarse como JSON o multipart/form-data.',
+        415,
+        { code: 'PROFILE_CONTENT_TYPE_NOT_SUPPORTED' },
+      );
+      logAvatarFailure(console, req, error, 'profile_content_type_rejected');
+      return next(error);
+    }
+
+    const rateLimitResult = rateLimiter?.consume(req.user?.id || 'anonymous');
+    if (rateLimitResult && !rateLimitResult.allowed) {
+      res.set('Retry-After', String(rateLimitResult.retryAfterSeconds));
+      const error = createHttpError(
+        'Has alcanzado el límite temporal de cambios de avatar.',
+        429,
+        {
+          code: 'AVATAR_RATE_LIMITED',
+          retry_after_seconds: rateLimitResult.retryAfterSeconds,
+        },
+      );
+      logAvatarFailure(console, req, error, 'avatar_rate_limited');
+      return next(error);
+    }
+
+    return upload.single('avatar')(req, res, (error) => {
+      if (!error) return next();
+      const normalized = normalizeMultipartError(error);
+      logAvatarFailure(console, req, normalized, 'multipart_rejected');
+      return next(normalized);
+    });
+  };
+}
+
+function normalizeMultipartError(error) {
+  if (error.status) return error;
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return createHttpError(
+        'El avatar no puede superar los 5 MB.',
+        413,
+        { code: 'AVATAR_INPUT_TOO_LARGE' },
+      );
+    }
+
+    const multipartErrors = {
+      LIMIT_UNEXPECTED_FILE: {
+        message: error.field === 'avatar'
+          ? 'Solo se permite un archivo en el campo avatar.'
+          : 'El archivo debe enviarse en el campo avatar.',
+        code: 'AVATAR_MULTIPART_FILE_INVALID',
+      },
+      LIMIT_FILE_COUNT: {
+        message: 'La petición de avatar solo puede contener un archivo.',
+        code: 'AVATAR_MULTIPART_FILE_COUNT',
+      },
+      LIMIT_PART_COUNT: {
+        message: 'La petición de avatar solo puede contener full_name y un archivo avatar.',
+        code: 'AVATAR_MULTIPART_PART_COUNT',
+      },
+      LIMIT_FIELD_COUNT: {
+        message: 'La petición de avatar solo puede contener el campo full_name.',
+        code: 'AVATAR_MULTIPART_FIELD_COUNT',
+      },
+      LIMIT_FIELD_KEY: {
+        message: 'El nombre de un campo de la petición de avatar no es válido.',
+        code: 'AVATAR_MULTIPART_FIELD_NAME',
+      },
+      LIMIT_FIELD_VALUE: {
+        message: 'El nombre del perfil es demasiado largo.',
+        code: 'AVATAR_MULTIPART_FIELD_VALUE',
+      },
+    };
+    const knownError = multipartErrors[error.code];
+    if (knownError) return createHttpError(knownError.message, 400, { code: knownError.code });
+
+    return createHttpError(
+      'La petición de avatar debe contener un solo archivo llamado avatar.',
+      400,
+      { code: `AVATAR_MULTIPART_${error.code || 'INVALID'}` },
+    );
+  }
+  return createHttpError('No se pudo recibir el avatar.', 400, { code: 'AVATAR_MULTIPART_INVALID' });
+}
+
+function isMultipartRequest(req) {
+  return Boolean(req.is?.('multipart/form-data'));
+}
+
+function logAvatarFailure(logger, req, error, fallbackReason) {
+  const reason = error?.details?.code || fallbackReason;
+  const message = `[identity-service] correlation_id=${req.correlationId || 'unknown'} user_id=${req.user?.id || 'unknown'} reason=${reason}`;
+  if (typeof logger?.warn === 'function') logger.warn(message);
 }
 
 async function findOrCreateGoogleUser(client, payload) {
@@ -303,4 +512,10 @@ function normalizeUniqueEmailError(error) {
   return createHttpError('Email already registered', 409);
 }
 
-module.exports = { createAuthRouter, createUpdatePreferencesHandler };
+module.exports = {
+  createAuthRouter,
+  createProfileUploadMiddleware,
+  createUpdatePreferencesHandler,
+  createUpdateProfileHandler,
+  normalizeMultipartError,
+};

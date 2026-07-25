@@ -4,7 +4,6 @@ import {
   Home,
   Grid2x2,
   ShoppingCart,
-  User,
   Tag,
   Headphones,
   LogOut,
@@ -17,6 +16,7 @@ import {
 import { contarItems } from '../services/carrito'
 import { useAuth } from '../context/useAuth'
 import { useWishlist } from '../context/useWishlist'
+import { DEFAULT_AVATAR_URL } from '../constants/avatar'
 
 import '../styles/Sidebar.css'
 
@@ -250,11 +250,11 @@ export default function Sidebar({ abierto, onCerrar }) {
               >
 
                 <div className="sidebar-usuario-avatar">
-                  {usuario.avatar_url ? (
-                    <img src={usuario.avatar_url} alt={usuario.full_name} className="sidebar-usuario-avatar-img" />
-                  ) : (
-                    <User size={18} color="#fff" />
-                  )}
+                  <img
+                    src={usuario.avatar_url || DEFAULT_AVATAR_URL}
+                    alt={usuario.full_name}
+                    className="sidebar-usuario-avatar-img"
+                  />
                 </div>
 
                 <div className="sidebar-usuario-info">

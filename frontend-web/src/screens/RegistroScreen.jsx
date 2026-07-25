@@ -4,6 +4,7 @@ import { User, Mail, Lock, Eye, EyeOff, ChevronRight } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import { hasGoogleClientId } from '../services/googleAuth'
 import GoogleLoginButton from '../components/GoogleLoginButton'
+import { DEFAULT_AVATAR_URL } from '../constants/avatar'
 import '../styles/RegistroScreen.css'
 
 const REAL_AVATARS = [
@@ -23,7 +24,7 @@ export default function RegistroScreen() {
   const [correo, setCorreo]         = useState('')
   const [contrasena, setContrasena] = useState('')
   const [verPass, setVerPass]       = useState(false)
-  const [avatarUrl, setAvatarUrl]   = useState(REAL_AVATARS[0])
+  const [avatarUrl, setAvatarUrl]   = useState(null)
   const [toast, setToast]           = useState(false)
   const [error, setError]           = useState('')
   const [cargando, setCargando]     = useState(false)
@@ -45,7 +46,7 @@ export default function RegistroScreen() {
         full_name: nombre,
         email: correo,
         password: contrasena,
-        avatar_url: avatarUrl,
+        avatar_url: avatarUrl || null,
       })
       setToast(true)
       setTimeout(() => {
@@ -83,6 +84,13 @@ export default function RegistroScreen() {
 
         <div className="emoji-body">
           <div className="emoji-grid">
+            <button
+              className={`emoji-item ${avatarUrl === null ? 'seleccionado' : ''}`}
+              onClick={() => setAvatarUrl(null)}
+              type="button"
+            >
+              <img src={DEFAULT_AVATAR_URL} alt="Avatar predeterminado" className="emoji-avatar-photo" />
+            </button>
             {REAL_AVATARS.map((photo) => (
               <button
                 key={photo}
@@ -97,7 +105,7 @@ export default function RegistroScreen() {
 
           <div className="emoji-preview">
             <div className="emoji-preview-avatar">
-              <img src={avatarUrl} alt="Vista previa" className="emoji-avatar-photo" />
+              <img src={avatarUrl || DEFAULT_AVATAR_URL} alt="Vista previa" className="emoji-avatar-photo" />
             </div>
             <div className="emoji-preview-info">
               <p>{nombre || 'Tu nombre'}</p>

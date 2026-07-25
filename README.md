@@ -219,6 +219,27 @@ docker compose exec -T postgres sh -c "psql -U \$POSTGRES_USER -d \$POSTGRES_DB 
 
 Después de ejecutarlo, si tienes la sesión abierta en el navegador, **cierra sesión y vuelve a entrar** para que se genere un nuevo token con tus privilegios actualizados.
 
+## Configurar Supabase Storage Para Avatares
+
+La edición de perfil acepta JSON para el nombre y `multipart/form-data` para una foto. El navegador nunca recibe ni usa la clave privada de Supabase.
+
+1. En Supabase crea un bucket público llamado `avatars`.
+2. Configura un límite de 5 MB y permite únicamente `image/jpeg`, `image/png` e `image/webp`.
+3. Mantén deshabilitadas las subidas desde el navegador; el bucket sólo necesita lectura pública para mostrar las fotos.
+4. Coloca estas variables en `.env` para que Compose las entregue exclusivamente a `identity-service`:
+
+```env
+SUPABASE_URL=https://tu-proyecto.supabase.co
+SUPABASE_SERVER_KEY=tu_clave_privada_de_servidor
+SUPABASE_AVATAR_BUCKET=avatars
+```
+
+La clave debe ser una clave privada de servidor y no debe comenzar con `VITE_`, entrar en `frontend-web` ni aparecer en respuestas HTTP. Las fotos se procesan en el backend, se guardan como WebP de 256×256 y se conserva sólo su URL pública en `identity.users.avatar_url`. No se migran los `data:` URLs existentes; usa una base limpia o elimínalos manualmente en desarrollo.
+
+Después de cambiar código o dependencias usa `docker compose up --build -d`; `docker compose restart` sólo reinicia la imagen que ya estaba construida. Después de cambiar únicamente `.env`, recrea al menos `identity-service` con `docker compose up -d --force-recreate identity-service`.
+
+Consulta la [documentación de buckets de Supabase](https://supabase.com/docs/guides/storage/buckets/fundamentals) y la de [control de acceso de Storage](https://supabase.com/docs/guides/storage/security/access-control) al endurecer el proyecto para producción.
+
 ## Configurar Stripe Sandbox En Windows O macOS
 
 Esta sección sólo es necesaria para probar `Ir a pagar`.

@@ -17,6 +17,23 @@ const ResolvedVariantSchema = z.object({
   seller_status: z.string().min(1),
   seller_role: z.string().min(1),
   seller_is_active: z.boolean(),
+  pickup_point_id: CanonicalUuidSchema.optional(),
+  pickup_point: z.object({
+    id: CanonicalUuidSchema.optional(),
+    name: z.string().min(1),
+    address_line: z.string().optional(),
+    city: z.string().min(1),
+    state: z.string().min(1),
+    postal_code: z.string().optional(),
+    reference: z.string().nullable().optional(),
+  }).nullable().optional(),
+  pickup_schedules: z.array(z.object({
+    id: CanonicalUuidSchema.optional(),
+    day_of_week: z.number().int().min(1).max(7),
+    start_time: z.string().min(1),
+    end_time: z.string().min(1),
+    timezone: z.string().default('America/Monterrey'),
+  })).optional(),
   buyer_reserved_quantity: z.number().int().nonnegative().default(0),
   cover_image: z.unknown().nullable().optional(),
 });

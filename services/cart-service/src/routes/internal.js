@@ -39,6 +39,9 @@ function createInternalRouter({ db, internalToken }) {
                     'quantity', ci.quantity,
                     'unit_price_cents', ci.unit_price_cents,
                     'currency', ci.currency,
+                    'pickup_point_id', ci.pickup_point_id,
+                    'pickup_point', ci.pickup_point,
+                    'pickup_schedules', ci.pickup_schedules,
                     'created_at', ci.created_at,
                     'updated_at', ci.updated_at
                   ) ORDER BY ci.created_at

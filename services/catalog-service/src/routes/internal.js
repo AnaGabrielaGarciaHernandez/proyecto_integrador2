@@ -163,9 +163,22 @@ function createInternalRouter({ db, internalToken, storage }) {
         ? { rows: [] }
         : await db.query(
           `SELECT id, seller_id, bazaar_id, category_id, name, description,
-                  condition, price_cents, currency, status, created_at,
-                  updated_at, published_at, removed_at
-           FROM catalog.products
+                  condition, price_cents, currency, status, pickup_point_id,
+                  created_at, updated_at, published_at, removed_at,
+                  (SELECT COALESCE(json_agg(pps ORDER BY pps.day_of_week, pps.start_time), '[]'::json)
+                   FROM catalog.product_pickup_schedules pps
+                   WHERE pps.product_id = p.id) AS pickup_schedules
+           FROM catalog.products p
+           WHERE p.seller_id = ANY($1::uuid[])
+           ORDER BY created_at`,
+          [sellerIds],
+        );
+      const pickupPoints = sellerIds.length === 0
+        ? { rows: [] }
+        : await db.query(
+          `SELECT id, seller_id, name, address_line, city, state, postal_code,
+                  reference, is_active, created_at, updated_at
+           FROM catalog.seller_pickup_points
            WHERE seller_id = ANY($1::uuid[])
            ORDER BY created_at`,
           [sellerIds],
@@ -186,6 +199,7 @@ function createInternalRouter({ db, internalToken, storage }) {
           seller_applications: applications.rows,
           bazaars: bazaars.rows,
           products: products.rows,
+          pickup_points: pickupPoints.rows,
           wishlist: wishlist.rows,
         },
       });
@@ -223,7 +237,14 @@ function createInternalRouter({ db, internalToken, storage }) {
         await client.query(
           `UPDATE catalog.inventory_reservation_items
            SET seller_user_id = md5($1::text)::uuid,
-               seller_name = 'Vendedor eliminado'
+               seller_name = 'Vendedor eliminado',
+               pickup_point_id = NULL,
+               pickup_point_snapshot = jsonb_build_object(
+                 'name', 'Punto eliminado',
+                 'city', 'Ciudad eliminada',
+                 'state', 'Estado eliminado'
+               ),
+               pickup_schedules = '[]'::jsonb
            WHERE seller_user_id = $1`,
           [userId],
         );
@@ -270,6 +291,19 @@ function createInternalRouter({ db, internalToken, storage }) {
                  address_line = NULL, city = NULL, state = NULL, postal_code = NULL,
                  status = 'suspended', updated_at = now()
              WHERE id = ANY($1::uuid[])`,
+            [sellerIds],
+          );
+          await client.query(
+            `UPDATE catalog.seller_pickup_points
+             SET name = 'Punto eliminado',
+                 address_line = 'Dirección eliminada',
+                 city = 'Ciudad eliminada',
+                 state = 'Estado eliminado',
+                 postal_code = '00000',
+                 reference = NULL,
+                 is_active = false,
+                 updated_at = now()
+             WHERE seller_id = ANY($1::uuid[])`,
             [sellerIds],
           );
         }

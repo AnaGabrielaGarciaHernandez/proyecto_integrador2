@@ -11,7 +11,11 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import { get, post } from '../services/api'
-import { createSellerProduct, getCategories } from '../services/seller'
+import {
+  createSellerProduct,
+  getCategories,
+  getSellerPickupPoints,
+} from '../services/seller'
 import '../styles/VenderScreen.css'
 
 const CONDITIONS = [
@@ -28,7 +32,18 @@ const INITIAL_PRODUCT = {
   condition: 'buen estado',
   price: '',
   categoryId: '',
+  pickupPointId: '',
 }
+
+const WEEK_DAYS = [
+  { value: 1, label: 'Lunes' },
+  { value: 2, label: 'Martes' },
+  { value: 3, label: 'Miércoles' },
+  { value: 4, label: 'Jueves' },
+  { value: 5, label: 'Viernes' },
+  { value: 6, label: 'Sábado' },
+  { value: 7, label: 'Domingo' },
+]
 
 export default function VenderScreen() {
   const { user, loading } = useAuth()
@@ -45,9 +60,12 @@ export default function VenderScreen() {
 
   const [product, setProduct] = useState(INITIAL_PRODUCT)
   const [categories, setCategories] = useState([])
-  const [categoriesLoading, setCategoriesLoading] = useState(false)
+  const [categoriesLoading, setCategoriesLoading] = useState(true)
+  const [pickupPoints, setPickupPoints] = useState([])
+  const [pickupPointsLoading, setPickupPointsLoading] = useState(true)
   const [productImages, setProductImages] = useState([])
   const [variants, setVariants] = useState([{ size_name: 'M', stock: 1 }])
+  const [pickupSchedules, setPickupSchedules] = useState([{ day_of_week: 1, start_time: '10:00', end_time: '14:00' }])
   const [productError, setProductError] = useState('')
   const [productSuccess, setProductSuccess] = useState(null)
   const [submittingProduct, setSubmittingProduct] = useState(false)
@@ -72,6 +90,18 @@ export default function VenderScreen() {
         if (mounted) setApplicationLoading(false)
       })
 
+    return () => { mounted = false }
+  }, [loading, userId, userRole])
+
+  useEffect(() => {
+    if (loading || !userId || userRole !== 'vendedor') return undefined
+    let mounted = true
+    getSellerPickupPoints()
+      .then((items) => { if (mounted) setPickupPoints(items) })
+      .catch((error) => {
+        if (mounted) setProductError(error.message || 'No pudimos cargar tus puntos de venta.')
+      })
+      .finally(() => { if (mounted) setPickupPointsLoading(false) })
     return () => { mounted = false }
   }, [loading, userId, userRole])
 
@@ -142,6 +172,8 @@ export default function VenderScreen() {
     )
   }
 
+  const activePickupPoints = pickupPoints.filter((point) => point.is_active)
+
   function updateProduct(field, value) {
     setProduct((current) => ({ ...current, [field]: value }))
   }
@@ -197,10 +229,27 @@ export default function VenderScreen() {
     setVariants((current) => current.length <= 1 ? current : current.filter((_, itemIndex) => itemIndex !== index))
   }
 
+  function addPickupSchedule() {
+    setPickupSchedules((current) => [...current, { day_of_week: 1, start_time: '10:00', end_time: '14:00' }])
+  }
+
+  function updatePickupSchedule(index, field, value) {
+    setPickupSchedules((current) => current.map((schedule, scheduleIndex) => (
+      scheduleIndex === index ? { ...schedule, [field]: field === 'day_of_week' ? Number(value) : value } : schedule
+    )))
+  }
+
+  function removePickupSchedule(index) {
+    setPickupSchedules((current) => current.length <= 1
+      ? current
+      : current.filter((_, scheduleIndex) => scheduleIndex !== index))
+  }
+
   function resetProductForm() {
     productImages.forEach((image) => URL.revokeObjectURL(image.preview))
     setProduct(INITIAL_PRODUCT)
     setVariants([{ size_name: 'M', stock: 1 }])
+    setPickupSchedules([{ day_of_week: 1, start_time: '10:00', end_time: '14:00' }])
     setProductImages([])
   }
 
@@ -221,6 +270,16 @@ export default function VenderScreen() {
       setProductError('Agrega una variante con stock positivo.')
       return
     }
+    if (!product.pickupPointId || !activePickupPoints.some((point) => point.id === product.pickupPointId)) {
+      setProductError('Selecciona un punto de venta activo antes de publicar.')
+      return
+    }
+    if (pickupSchedules.length === 0 || pickupSchedules.some((schedule) => (
+      !schedule.day_of_week || !schedule.start_time || !schedule.end_time || schedule.start_time >= schedule.end_time
+    ))) {
+      setProductError('Agrega al menos un horario válido de recogida.')
+      return
+    }
 
     const payload = new FormData()
     payload.append('name', product.name.trim())
@@ -228,6 +287,8 @@ export default function VenderScreen() {
     payload.append('condition', product.condition)
     payload.append('price_mxn', product.price)
     payload.append('category_id', product.categoryId)
+    payload.append('pickup_point_id', product.pickupPointId)
+    payload.append('pickup_schedules', JSON.stringify(pickupSchedules))
     payload.append('variants', JSON.stringify(variants.map((variant) => ({
       size_name: variant.size_name.trim(),
       stock: Number(variant.stock),
@@ -442,9 +503,55 @@ export default function VenderScreen() {
             </select>
           </section>
 
+          <section className="vender-form-section pickup-product-section">
+            <div className="vender-section-heading">
+              <div>
+                <p className="vender-step-label">Punto y horarios de recogida</p>
+                <p className="vender-help">Elige dónde recogerán la prenda y agrega uno o más bloques semanales.</p>
+              </div>
+              <Link className="vender-small-action pickup-manage-link" to="/mis-direcciones">Administrar puntos</Link>
+            </div>
+            {pickupPointsLoading && <p className="vender-status-loading">Cargando puntos de venta...</p>}
+            {!pickupPointsLoading && activePickupPoints.length === 0 && (
+              <div className="pickup-form-warning" role="alert">
+                <AlertCircle size={17} />
+                <span>No tienes puntos activos. <Link to="/mis-direcciones">Crea uno en Mis direcciones</Link> para continuar.</span>
+              </div>
+            )}
+            <label htmlFor="pickup-point">Punto de venta activo</label>
+            <select
+              id="pickup-point"
+              value={product.pickupPointId}
+              onChange={(event) => updateProduct('pickupPointId', event.target.value)}
+              disabled={submittingProduct || pickupPointsLoading}
+              required
+            >
+              <option value="">Selecciona un punto</option>
+              {activePickupPoints.map((point) => (
+                <option key={point.id} value={point.id}>{point.name} · {point.city}, {point.state}</option>
+              ))}
+            </select>
+            <div className="pickup-schedules-heading">
+              <span>Horarios semanales</span>
+              <button type="button" className="vender-small-action" onClick={addPickupSchedule} disabled={submittingProduct}>+ Agregar bloque</button>
+            </div>
+            <div className="pickup-schedules-editor">
+              {pickupSchedules.map((schedule, index) => (
+                <div className="pickup-schedule-row" key={`${index}-${schedule.day_of_week}-${schedule.start_time}`}>
+                  <select aria-label={`Día del horario ${index + 1}`} value={schedule.day_of_week} onChange={(event) => updatePickupSchedule(index, 'day_of_week', event.target.value)} disabled={submittingProduct}>
+                    {WEEK_DAYS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}
+                  </select>
+                  <label>Desde<input type="time" value={schedule.start_time} onChange={(event) => updatePickupSchedule(index, 'start_time', event.target.value)} disabled={submittingProduct} required /></label>
+                  <label>Hasta<input type="time" value={schedule.end_time} onChange={(event) => updatePickupSchedule(index, 'end_time', event.target.value)} disabled={submittingProduct} required /></label>
+                  <button type="button" className="icon-button danger" onClick={() => removePickupSchedule(index)} disabled={submittingProduct || pickupSchedules.length <= 1} aria-label="Eliminar horario"><Trash2 size={16} /></button>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <div className="vender-actions">
             <Link className="btn-ghost" to="/panel-vendedor">Ir al panel</Link>
-            <button className="btn-primary" type="submit" disabled={submittingProduct || categoriesLoading}>
+            <button className="btn-primary" type="submit" disabled={submittingProduct || categoriesLoading || pickupPointsLoading || activePickupPoints.length === 0}>
               {submittingProduct ? 'Publicando imágenes...' : 'Publicar ahora'}
             </button>
           </div>

@@ -155,9 +155,34 @@ function createInternalRouter({ db, internalToken }) {
                     'quantity', oi.quantity,
                     'unit_price_cents', oi.unit_price_cents,
                     'total_cents', oi.total_cents,
+                    'pickup_point_id', oi.pickup_point_id,
+                    'pickup_point', oi.pickup_point,
+                    'pickup_schedules', oi.pickup_schedules,
                     'created_at', oi.created_at
                   ) ORDER BY oi.created_at
                 ) FILTER (WHERE oi.id IS NOT NULL), '[]'::json) AS items
+                ,COALESCE((
+                  SELECT json_agg(
+                    json_build_object(
+                      'id', pg.id,
+                      'seller_name', pg.seller_name,
+                      'point', json_build_object(
+                        'name', pg.point_name,
+                        'address_line', pg.address_line,
+                        'city', pg.city,
+                        'state', pg.state,
+                        'postal_code', pg.postal_code,
+                        'reference', pg.reference
+                      ),
+                      'scheduled_start_at', pg.scheduled_start_at,
+                      'scheduled_end_at', pg.scheduled_end_at,
+                      'deadline_at', pg.deadline_at,
+                      'status', pg.status
+                    ) ORDER BY pg.scheduled_start_at, pg.id
+                  )
+                  FROM ordering.pickup_groups pg
+                  WHERE pg.order_id = o.id
+                ), '[]'::json) AS pickup_groups
          FROM ordering.orders o
          LEFT JOIN ordering.order_items oi ON oi.order_id = o.id
          WHERE o.buyer_id = $1
@@ -183,9 +208,34 @@ function createInternalRouter({ db, internalToken }) {
                     'quantity', oi.quantity,
                     'unit_price_cents', oi.unit_price_cents,
                     'total_cents', oi.total_cents,
+                    'pickup_point_id', oi.pickup_point_id,
+                    'pickup_point', oi.pickup_point,
+                    'pickup_schedules', oi.pickup_schedules,
                     'created_at', oi.created_at
                   ) ORDER BY oi.created_at
                 ), '[]'::json) AS items
+                ,COALESCE((
+                  SELECT json_agg(
+                    json_build_object(
+                      'id', pg.id,
+                      'seller_name', pg.seller_name,
+                      'point', json_build_object(
+                        'name', pg.point_name,
+                        'address_line', pg.address_line,
+                        'city', pg.city,
+                        'state', pg.state,
+                        'postal_code', pg.postal_code,
+                        'reference', pg.reference
+                      ),
+                      'scheduled_start_at', pg.scheduled_start_at,
+                      'scheduled_end_at', pg.scheduled_end_at,
+                      'deadline_at', pg.deadline_at,
+                      'status', pg.status
+                    ) ORDER BY pg.scheduled_start_at, pg.id
+                  )
+                  FROM ordering.pickup_groups pg
+                  WHERE pg.order_id = o.id AND pg.seller_user_id = $1
+                ), '[]'::json) AS pickup_groups
          FROM ordering.orders o
          JOIN ordering.order_items oi
            ON oi.order_id = o.id AND oi.seller_user_id = $1
@@ -222,7 +272,30 @@ function createInternalRouter({ db, internalToken }) {
         );
         const items = await client.query(
           `UPDATE ordering.order_items
-           SET seller_user_id = md5($1::text)::uuid
+           SET seller_user_id = md5($1::text)::uuid,
+               seller_name = 'Vendedor eliminado',
+               pickup_point_id = NULL,
+               pickup_point = jsonb_build_object(
+                 'name', 'Punto eliminado',
+                 'city', 'Ciudad eliminada',
+                 'state', 'Estado eliminado'
+               ),
+               pickup_schedules = '[]'::jsonb
+           WHERE seller_user_id = $1`,
+          [userId],
+        );
+        await client.query(
+          `UPDATE ordering.pickup_groups
+           SET seller_user_id = md5($1::text)::uuid,
+               seller_name = 'Vendedor eliminado',
+               pickup_point_id = NULL,
+               point_name = 'Punto eliminado',
+               address_line = 'Dirección eliminada',
+               city = 'Ciudad eliminada',
+               state = 'Estado eliminado',
+               postal_code = '00000',
+               reference = NULL,
+               updated_at = now()
            WHERE seller_user_id = $1`,
           [userId],
         );

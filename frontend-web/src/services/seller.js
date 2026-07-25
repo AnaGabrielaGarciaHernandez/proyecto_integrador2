@@ -5,6 +5,23 @@ export async function getCategories() {
   return data?.categories || []
 }
 
+export async function getSellerPickupPoints() {
+  const data = await get('/seller/pickup-points')
+  return data?.pickup_points || []
+}
+
+export async function createSellerPickupPoint(payload) {
+  return post('/seller/pickup-points', payload)
+}
+
+export async function updateSellerPickupPoint(id, payload) {
+  return patch(`/seller/pickup-points/${id}`, payload)
+}
+
+export async function updateSellerPickupPointStatus(id, isActive) {
+  return patch(`/seller/pickup-points/${id}/status`, { is_active: isActive })
+}
+
 export async function getSellerProducts({ search = '', status = '', limit = 25, offset = 0 } = {}) {
   const params = new URLSearchParams({ search, limit: String(limit), offset: String(offset) })
   if (status) params.set('status', status)

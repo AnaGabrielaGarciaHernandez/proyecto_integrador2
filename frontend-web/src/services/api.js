@@ -39,6 +39,12 @@ const PUBLIC_ERROR_MESSAGES = {
   USER_DELETION_PENDING: 'Esta cuenta tiene una eliminación pendiente y no puede modificarse.',
   SELLER_APPLICATION_PENDING: 'Ya tienes una solicitud de vendedor en revisión.',
   SELLER_APPLICATION_ALREADY_REVIEWED: 'Esta cuenta ya tiene una solicitud aprobada o suspendida.',
+  PICKUP_POINT_REQUIRED: 'Selecciona un punto de venta antes de publicar.',
+  PICKUP_POINT_INVALID: 'El punto de venta no existe, no te pertenece o está inactivo.',
+  PICKUP_POINT_NOT_FOUND: 'El punto de venta no existe o ya no te pertenece.',
+  PICKUP_POINT_VALIDATION_ERROR: 'Revisa los datos del punto de venta.',
+  PICKUP_SCHEDULE_REQUIRED: 'Agrega al menos un horario de recogida antes de publicar.',
+  PICKUP_SCHEDULES_INVALID: 'Revisa los días y horarios de recogida.',
 }
 
 async function request(path, options = {}) {

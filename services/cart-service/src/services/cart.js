@@ -23,9 +23,9 @@ async function addItem(db, catalogClient, buyerId, input, correlationId) {
       `INSERT INTO cart_items
          (cart_id, variant_id, product_id, seller_id, seller_user_id, product_name,
           size_name, seller_name, quantity, unit_price_cents, currency, stock_snapshot,
-          product_status, cover_image)
+          product_status, cover_image, pickup_point_id, pickup_point, pickup_schedules)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::integer, $10::integer, $11,
-               $12::integer, $13, $14::jsonb)
+               $12::integer, $13, $14::jsonb, $15, $16::jsonb, $17::jsonb)
        ON CONFLICT (cart_id, variant_id) DO UPDATE
        SET quantity = cart_items.quantity + EXCLUDED.quantity,
            product_id = EXCLUDED.product_id,
@@ -38,13 +38,19 @@ async function addItem(db, catalogClient, buyerId, input, correlationId) {
            currency = EXCLUDED.currency,
            stock_snapshot = EXCLUDED.stock_snapshot,
            product_status = EXCLUDED.product_status,
-           cover_image = EXCLUDED.cover_image
+           cover_image = EXCLUDED.cover_image,
+           pickup_point_id = EXCLUDED.pickup_point_id,
+           pickup_point = EXCLUDED.pickup_point,
+           pickup_schedules = EXCLUDED.pickup_schedules
        WHERE cart_items.quantity + EXCLUDED.quantity <= EXCLUDED.stock_snapshot
        RETURNING id`,
       [cart.id, variant.variant_id, variant.product_id, variant.seller_id,
         variant.seller_user_id, variant.product_name, variant.size_name, variant.seller_name,
         input.quantity, variant.unit_price_cents, variant.currency, available,
-        variant.product_status, JSON.stringify(variant.cover_image || null)],
+        variant.product_status, JSON.stringify(variant.cover_image || null),
+        variant.pickup_point_id || null,
+        JSON.stringify(variant.pickup_point || null),
+        JSON.stringify(variant.pickup_schedules || [])],
     );
     if (!result.rows[0]) {
       throw stockError(available);
@@ -180,6 +186,9 @@ async function getCartSnapshot(db, buyerId) {
       unit_price_cents: item.unit_price_cents,
       currency: item.currency,
       image_url: item.cover_image?.url || null,
+      pickup_point_id: item.pickup_point_id || undefined,
+      pickup_point: item.pickup_point || null,
+      pickup_schedules: item.pickup_schedules || [],
     })),
     subtotal_cents: subtotal,
     total_cents: subtotal,
@@ -218,6 +227,9 @@ async function getCartItems(client, cartId) {
        stock_snapshot::integer AS stock,
        product_status,
        cover_image,
+       pickup_point_id,
+       pickup_point,
+       pickup_schedules,
        created_at,
        updated_at
      FROM cart_items
@@ -247,6 +259,8 @@ function formatCart(cart, items) {
       currency: item.currency,
       seller: { id: item.seller_id, display_name: item.seller_name },
       cover_image: item.cover_image,
+      pickup_point: publicPickupPoint(item.pickup_point),
+      pickup_schedules: item.pickup_schedules || [],
       created_at: item.created_at,
       updated_at: item.updated_at,
     })),
@@ -268,11 +282,23 @@ function ensureAvailableVariant(variant, quantity) {
 }
 
 function isAvailableVariant(variant) {
+  const hasPickupData = Boolean(variant && (
+    Object.hasOwn(variant, 'pickup_point_id')
+    || Object.hasOwn(variant, 'pickup_point')
+    || Object.hasOwn(variant, 'pickup_schedules')
+  ));
+  const hasPickupConfiguration = Boolean(
+    variant?.pickup_point_id
+    && variant?.pickup_point
+    && Array.isArray(variant.pickup_schedules)
+    && variant.pickup_schedules.length > 0,
+  );
   return Boolean(variant)
     && variant.product_status === 'active'
     && variant.seller_status === 'approved'
     && variant.seller_role === 'vendedor'
-    && variant.seller_is_active === true;
+    && variant.seller_is_active === true
+    && (!hasPickupData || hasPickupConfiguration);
 }
 
 function availableStock(variant) {
@@ -298,13 +324,28 @@ async function updateItemSnapshot(client, cartId, itemId, quantity, available, v
          currency = $9,
          stock_snapshot = $10::integer,
          product_status = $11,
-         cover_image = $12::jsonb
-     WHERE id = $13 AND cart_id = $14`,
+         cover_image = $12::jsonb,
+         pickup_point_id = $13,
+         pickup_point = $14::jsonb,
+         pickup_schedules = $15::jsonb
+     WHERE id = $16 AND cart_id = $17`,
     [quantity, variant.product_id, variant.seller_id, variant.seller_user_id,
       variant.product_name, variant.size_name, variant.seller_name, variant.unit_price_cents,
       variant.currency, available, variant.product_status,
-      JSON.stringify(variant.cover_image || null), itemId, cartId],
+      JSON.stringify(variant.cover_image || null), variant.pickup_point_id || null,
+      JSON.stringify(variant.pickup_point || null),
+      JSON.stringify(variant.pickup_schedules || []), itemId, cartId],
   );
+}
+
+function publicPickupPoint(point) {
+  if (!point) return null;
+  return {
+    id: point.id,
+    name: point.name,
+    city: point.city,
+    state: point.state,
+  };
 }
 
 function quantityAdjustedAdjustment(item, nextQuantity) {

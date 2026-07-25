@@ -14,6 +14,7 @@ const PRODUCT_CONDITIONS = Object.freeze([
 const PRODUCT_STATUSES = Object.freeze(['draft', 'active', 'paused', 'sold', 'removed']);
 const EDITABLE_STATUSES = Object.freeze(['active', 'paused', 'removed']);
 const UUID_SCHEMA = z.string().uuid();
+const PICKUP_TIME_ZONE = 'America/Monterrey';
 
 async function listSellerProducts(db, user, input) {
   await getApprovedSeller(db, user);
@@ -39,7 +40,7 @@ async function listSellerProducts(db, user, input) {
   const total = Number(countResult.rows[0]?.total || 0);
   params.push(input.limit, input.offset);
   const result = await db.query(
-    `${productSelect({ detail: true })}
+    `${productSelect({ detail: true, includePickupAddress: true })}
      WHERE ${where.join(' AND ')}
      ORDER BY p.created_at DESC, p.id DESC
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -60,7 +61,7 @@ async function listSellerProducts(db, user, input) {
 async function getSellerProduct(db, user, productId, executor = db) {
   await getApprovedSeller(executor, user);
   const result = await executor.query(
-    `${productSelect({ detail: true })}
+    `${productSelect({ detail: true, includePickupAddress: true })}
      WHERE p.id = $1 AND sp.user_id = $2`,
     [productId, user.id],
   );
@@ -90,13 +91,15 @@ async function createSellerProduct(db, storage, config, user, input, files) {
     await db.transaction(async (client) => {
       const seller = await getApprovedSeller(client, user);
       await validateCategory(client, normalized.categoryId);
+      await validatePickupPoint(client, normalized.pickupPointId, seller.id);
       await client.query(
         `INSERT INTO products
            (id, seller_id, category_id, name, description, condition, price_cents,
-            currency, status, published_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'MXN', 'active', now())`,
+            currency, status, pickup_point_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'MXN', 'draft', $8)`,
         [productId, seller.id, normalized.categoryId, normalized.name,
-          normalized.description, normalized.condition, normalized.priceCents],
+          normalized.description, normalized.condition, normalized.priceCents,
+          normalized.pickupPointId],
       );
 
       for (const variant of normalized.variants) {
@@ -106,6 +109,14 @@ async function createSellerProduct(db, storage, config, user, input, files) {
           [productId, variant.sizeName, variant.stock],
         );
       }
+
+      await replacePickupSchedules(client, productId, normalized.pickupSchedules);
+      await client.query(
+        `UPDATE products
+         SET status = 'active', published_at = now(), updated_at = now()
+         WHERE id = $1`,
+        [productId],
+      );
 
       for (const [sortOrder, item] of uploaded.entries()) {
         const fileResult = await client.query(
@@ -144,6 +155,14 @@ async function updateSellerProduct(db, user, productId, input) {
     }
 
     if (normalized.categoryId) await validateCategory(client, normalized.categoryId);
+    if (normalized.pickupPointId !== undefined) {
+      if (normalized.pickupPointId === null) {
+        // A seller may temporarily clear the assignment while editing. The
+        // product is made non-public until a valid point is selected again.
+      } else {
+        await validatePickupPoint(client, normalized.pickupPointId, seller.id);
+      }
+    }
     if (normalized.variants) {
       await updateVariants(client, productId, normalized.variants);
     }
@@ -156,11 +175,28 @@ async function updateSellerProduct(db, user, productId, input) {
       ['condition', normalized.condition],
       ['price_cents', normalized.priceCents],
       ['category_id', normalized.categoryId],
+      ['pickup_point_id', normalized.pickupPointId],
     ]) {
       if (value !== undefined) {
         params.push(value);
         updates.push(`${column} = $${params.length}`);
       }
+    }
+    const nextPickupPointId = normalized.pickupPointId === undefined
+      ? current.pickup_point_id
+      : normalized.pickupPointId;
+    const nextScheduleCount = normalized.pickupSchedules === undefined
+      ? null
+      : normalized.pickupSchedules.length;
+    if (nextScheduleCount !== null && nextScheduleCount > 0 && !nextPickupPointId) {
+      throw createHttpError('Selecciona un punto de venta antes de agregar horarios.', 409, {
+        code: 'PICKUP_POINT_REQUIRED',
+      });
+    }
+    if (current.status === 'active'
+      && (nextPickupPointId === null || nextScheduleCount === 0)) {
+      updates.push('status = \'paused\'');
+      updates.push('published_at = published_at');
     }
     if (updates.length > 0) {
       await client.query(
@@ -168,6 +204,13 @@ async function updateSellerProduct(db, user, productId, input) {
          WHERE id = $1`,
         params,
       );
+    }
+
+    // The database trigger for schedules requires the product point to exist
+    // first. This matters when completing an older product that was created
+    // before pickup points were mandatory.
+    if (normalized.pickupSchedules !== undefined) {
+      await replacePickupSchedules(client, productId, normalized.pickupSchedules);
     }
 
     return getSellerProduct(db, user, productId, client);
@@ -202,6 +245,7 @@ async function updateSellerProductStatus(db, storage, user, productId, status) {
           code: 'PRODUCT_STOCK_REQUIRED',
         });
       }
+      await validatePickupConfiguration(client, productId, current.seller_id);
     }
 
     if (status === 'removed' && current.status !== 'removed') {
@@ -415,7 +459,7 @@ async function getApprovedSeller(executor, user) {
 
 async function lockOwnedProduct(client, productId, sellerId) {
   const result = await client.query(
-    `SELECT id, seller_id, status
+    `SELECT id, seller_id, status, pickup_point_id
      FROM products
      WHERE id = $1 AND seller_id = $2
      FOR UPDATE`,
@@ -423,6 +467,65 @@ async function lockOwnedProduct(client, productId, sellerId) {
   );
   if (!result.rows[0]) throw productNotFound();
   return result.rows[0];
+}
+
+async function validatePickupPoint(executor, pickupPointId, sellerId) {
+  const parsed = UUID_SCHEMA.safeParse(pickupPointId);
+  if (!parsed.success) {
+    throw createHttpError('Selecciona un punto de venta válido.', 400, {
+      code: 'PICKUP_POINT_REQUIRED',
+    });
+  }
+  const result = await executor.query(
+    `SELECT id
+     FROM seller_pickup_points
+     WHERE id = $1 AND seller_id = $2 AND is_active IS TRUE`,
+    [parsed.data, sellerId],
+  );
+  if (!result.rows[0]) {
+    throw createHttpError('El punto de venta no existe, no te pertenece o está inactivo.', 400, {
+      code: 'PICKUP_POINT_INVALID',
+    });
+  }
+}
+
+async function validatePickupConfiguration(executor, productId, sellerId) {
+  const point = await executor.query(
+    `SELECT p.pickup_point_id
+     FROM products p
+     JOIN seller_pickup_points spp
+       ON spp.id = p.pickup_point_id
+      AND spp.seller_id = $2
+      AND spp.is_active IS TRUE
+     WHERE p.id = $1`,
+    [productId, sellerId],
+  );
+  if (!point.rows[0]?.pickup_point_id) {
+    throw createHttpError('Selecciona un punto de venta antes de publicar.', 409, {
+      code: 'PICKUP_POINT_REQUIRED',
+    });
+  }
+  const schedules = await executor.query(
+    `SELECT 1 FROM product_pickup_schedules WHERE product_id = $1 LIMIT 1`,
+    [productId],
+  );
+  if (!schedules.rows[0]) {
+    throw createHttpError('Agrega al menos un horario de recogida antes de publicar.', 409, {
+      code: 'PICKUP_SCHEDULE_REQUIRED',
+    });
+  }
+}
+
+async function replacePickupSchedules(client, productId, schedules) {
+  await client.query('DELETE FROM product_pickup_schedules WHERE product_id = $1', [productId]);
+  for (const schedule of schedules) {
+    await client.query(
+      `INSERT INTO product_pickup_schedules
+         (product_id, day_of_week, start_time, end_time, timezone)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [productId, schedule.dayOfWeek, schedule.startTime, schedule.endTime, PICKUP_TIME_ZONE],
+    );
+  }
 }
 
 async function validateCategory(executor, categoryId) {
@@ -506,6 +609,7 @@ function normalizeUpdateInput(input, { required = false } = {}) {
   const description = source.description === undefined ? undefined : String(source.description).trim();
   const condition = source.condition === undefined ? undefined : String(source.condition).trim().toLowerCase();
   const categoryId = source.category_id === undefined ? undefined : String(source.category_id).trim();
+  const pickupPointSource = source.pickup_point_id;
 
   if (required || name !== undefined) {
     if (!name || name.length > 180) throw invalidProduct('El nombre es obligatorio y no puede superar 180 caracteres.');
@@ -530,10 +634,80 @@ function normalizeUpdateInput(input, { required = false } = {}) {
   if (required || source.variants !== undefined) {
     output.variants = normalizeVariants(source.variants);
   }
+  if (required || pickupPointSource !== undefined) {
+    if (pickupPointSource === null || String(pickupPointSource).trim() === '') {
+      if (required) throw createHttpError('El punto de venta es obligatorio.', 400, {
+        code: 'PICKUP_POINT_REQUIRED',
+      });
+      output.pickupPointId = null;
+    } else {
+      const parsedPoint = UUID_SCHEMA.safeParse(String(pickupPointSource).trim());
+      if (!parsedPoint.success) {
+        throw createHttpError('El punto de venta no es válido.', 400, {
+          code: 'PICKUP_POINT_INVALID',
+        });
+      }
+      output.pickupPointId = parsedPoint.data;
+    }
+  }
+  if (required || source.pickup_schedules !== undefined) {
+    output.pickupSchedules = normalizePickupSchedules(source.pickup_schedules);
+    if (required && output.pickupSchedules.length === 0) {
+      throw createHttpError('Agrega al menos un horario de recogida.', 400, {
+        code: 'PICKUP_SCHEDULE_REQUIRED',
+      });
+    }
+  }
   if (!required && Object.keys(output).length === 0) {
     throw invalidProduct('Debes enviar al menos un campo para editar.');
   }
   return output;
+}
+
+function normalizePickupSchedules(value) {
+  let parsed = value;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      throw invalidProduct('Los horarios de recogida no tienen un formato válido.');
+    }
+  }
+  if (!Array.isArray(parsed) || parsed.length > 40) {
+    throw createHttpError('Debes agregar entre 1 y 40 horarios de recogida.', 400, {
+      code: 'PICKUP_SCHEDULES_INVALID',
+    });
+  }
+  const seen = new Set();
+  return parsed.map((schedule) => {
+    const dayOfWeek = Number(schedule?.day_of_week ?? schedule?.dayOfWeek ?? schedule?.day);
+    const startTime = normalizePickupTime(schedule?.start_time ?? schedule?.startTime);
+    const endTime = normalizePickupTime(schedule?.end_time ?? schedule?.endTime);
+    if (!Number.isInteger(dayOfWeek) || dayOfWeek < 1 || dayOfWeek > 7 || !startTime || !endTime) {
+      throw createHttpError('Cada horario debe tener día, hora inicial y hora final válidos.', 400, {
+        code: 'PICKUP_SCHEDULES_INVALID',
+      });
+    }
+    if (startTime >= endTime) {
+      throw createHttpError('La hora final debe ser posterior a la hora inicial.', 400, {
+        code: 'PICKUP_SCHEDULES_INVALID',
+      });
+    }
+    const key = `${dayOfWeek}-${startTime}-${endTime}`;
+    if (seen.has(key)) {
+      throw createHttpError('No puedes repetir un horario de recogida.', 400, {
+        code: 'PICKUP_SCHEDULES_INVALID',
+      });
+    }
+    seen.add(key);
+    return { dayOfWeek, startTime, endTime };
+  });
+}
+
+function normalizePickupTime(value) {
+  const text = String(value ?? '').trim();
+  const match = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.exec(text);
+  return match ? text.slice(0, 5) : null;
 }
 
 function normalizeVariants(value) {
@@ -641,6 +815,7 @@ module.exports = {
   getSellerProduct,
   listSellerProducts,
   normalizeCreateInput,
+  normalizePickupSchedules,
   normalizeUpdateInput,
   reorderSellerProductImages,
   setSellerProductCover,

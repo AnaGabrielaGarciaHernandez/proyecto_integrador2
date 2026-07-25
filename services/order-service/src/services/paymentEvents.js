@@ -15,7 +15,11 @@ function createPaymentEventHandler({ orders, catalogClient }) {
     if (!orderId) return;
 
     if (event.event_type === EVENT_TYPES.PAYMENT_COMPLETED) {
-      const result = await orders.transitionPaid(orderId, event.payload, client);
+      const result = await orders.transitionPaid(
+        orderId,
+        { ...event.payload, occurred_at: event.occurred_at },
+        client,
+      );
       if (!result.order || !result.transitioned) return;
       if (event.payload.buyer_id && event.payload.buyer_id !== result.order.buyer_id) {
         throw new Error('Payment buyer does not match order buyer');

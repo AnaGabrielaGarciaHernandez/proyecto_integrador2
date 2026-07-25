@@ -1,4 +1,8 @@
 const { createHttpError } = require('@ecobazar/platform');
+const {
+  calculatePickupDeadline,
+  findNextPickupWindow,
+} = require('../services/pickup');
 
 const ITEM_JSON = `jsonb_build_object(
   'id', oi.id,
@@ -7,6 +11,9 @@ const ITEM_JSON = `jsonb_build_object(
   'seller_id', oi.seller_id,
   'seller_user_id', oi.seller_user_id,
   'seller_name', oi.seller_name,
+  'pickup_point_id', oi.pickup_point_id,
+  'pickup_point', oi.pickup_point,
+  'pickup_schedules', oi.pickup_schedules,
   'product_name', oi.product_name,
   'size_name', oi.size_name,
   'image_url', oi.cover_image,
@@ -15,6 +22,42 @@ const ITEM_JSON = `jsonb_build_object(
   'total_cents', oi.total_cents,
   'created_at', oi.created_at
 )`;
+
+const PICKUP_GROUPS_JSON = `COALESCE((
+  SELECT jsonb_agg(
+    jsonb_build_object(
+      'id', pg.id,
+      'seller_name', pg.seller_name,
+      'point', jsonb_build_object(
+        'name', pg.point_name,
+        'address_line', pg.address_line,
+        'city', pg.city,
+        'state', pg.state,
+        'postal_code', pg.postal_code,
+        'reference', pg.reference
+      ),
+      'scheduled_start_at', pg.scheduled_start_at,
+      'scheduled_end_at', pg.scheduled_end_at,
+      'deadline_at', pg.deadline_at,
+      'status', pg.status,
+      'items', COALESCE((
+        SELECT jsonb_agg(${ITEM_JSON} ORDER BY oi.created_at)
+        FROM pickup_group_items pgi
+        JOIN order_items oi ON oi.id = pgi.order_item_id
+        WHERE pgi.pickup_group_id = pg.id
+      ), '[]'::jsonb)
+    ) ORDER BY pg.scheduled_start_at, pg.id
+  )
+  FROM pickup_groups pg
+  WHERE pg.order_id = o.id
+), '[]'::jsonb) AS pickup_groups`;
+
+function sellerPickupGroupsJson(sellerUserParameter) {
+  return PICKUP_GROUPS_JSON.replace(
+    'WHERE pg.order_id = o.id',
+    `WHERE pg.order_id = o.id AND pg.seller_user_id = $${sellerUserParameter}`,
+  );
+}
 
 function createOrdersRepository(db) {
   async function getPendingByBuyer(buyerId) {
@@ -53,12 +96,15 @@ function createOrdersRepository(db) {
         await client.query(
           `INSERT INTO order_items
              (order_id, variant_id, product_id, seller_id, seller_user_id,
-              product_name, size_name, cover_image, quantity, unit_price_cents, total_cents)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+              product_name, size_name, cover_image, quantity, unit_price_cents, total_cents,
+              pickup_point_id, pickup_point, pickup_schedules)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb)`,
           [order.id, item.variant_id, item.product_id, item.seller_id,
             item.seller_user_id || null, item.product_name, item.size_name,
             item.image_url || null, item.quantity, item.unit_price_cents,
-            item.quantity * item.unit_price_cents],
+            item.quantity * item.unit_price_cents, item.pickup_point_id || null,
+            JSON.stringify(item.pickup_point || null),
+            JSON.stringify(item.pickup_schedules || [])],
         );
       }
       await client.query(
@@ -85,7 +131,8 @@ function createOrdersRepository(db) {
     const result = await executor.query(
       `SELECT o.*, s.status AS saga_status, s.correlation_id, s.last_error,
          COALESCE(jsonb_agg(${ITEM_JSON} ORDER BY oi.created_at)
-           FILTER (WHERE oi.id IS NOT NULL), '[]'::jsonb) AS items
+           FILTER (WHERE oi.id IS NOT NULL), '[]'::jsonb) AS items,
+         ${PICKUP_GROUPS_JSON}
        FROM orders o
        JOIN checkout_sagas s ON s.order_id = o.id
        LEFT JOIN order_items oi ON oi.order_id = o.id
@@ -110,10 +157,15 @@ function createOrdersRepository(db) {
           `UPDATE order_items
            SET seller_user_id = COALESCE($3, seller_user_id),
                product_id = COALESCE($4, product_id),
-               seller_name = COALESCE($5, seller_name)
+               seller_name = COALESCE($5, seller_name),
+               pickup_point_id = COALESCE($6, pickup_point_id),
+               pickup_point = COALESCE($7::jsonb, pickup_point),
+               pickup_schedules = COALESCE($8::jsonb, pickup_schedules)
            WHERE order_id = $1 AND variant_id = $2`,
           [orderId, item.variant_id, item.seller_user_id || null, item.product_id || null,
-            item.seller_name || null],
+            item.seller_name || null, item.pickup_point_id || null,
+            item.pickup_point ? JSON.stringify(item.pickup_point) : null,
+            item.pickup_schedules ? JSON.stringify(item.pickup_schedules) : null],
         );
       }
       console.log(`[order-service] correlation_id=${correlationId} event_type=checkout.requested step=inventory_reserved order_id=${orderId}`);
@@ -163,6 +215,12 @@ function createOrdersRepository(db) {
          SET status = 'paid', last_error = NULL, updated_at = now()
          WHERE order_id = $1`,
         [orderId],
+      );
+      const paidOrder = await getSagaOrder(orderId, executor);
+      await createPickupGroups(
+        executor,
+        paidOrder,
+        payment.occurred_at || paidOrder?.paid_at,
       );
     }
     return {
@@ -227,7 +285,8 @@ function createOrdersRepository(db) {
     const result = await db.query(
       `SELECT o.*,
          COALESCE(jsonb_agg(${ITEM_JSON} ORDER BY oi.created_at)
-           FILTER (WHERE oi.id IS NOT NULL), '[]'::jsonb) AS items
+           FILTER (WHERE oi.id IS NOT NULL), '[]'::jsonb) AS items,
+         ${PICKUP_GROUPS_JSON}
        FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id
        WHERE o.buyer_id = $1
        GROUP BY o.id ORDER BY o.created_at DESC`,
@@ -240,7 +299,8 @@ function createOrdersRepository(db) {
     const result = await db.query(
       `SELECT o.*,
          COALESCE(jsonb_agg(${ITEM_JSON} ORDER BY oi.created_at)
-           FILTER (WHERE oi.id IS NOT NULL), '[]'::jsonb) AS items
+           FILTER (WHERE oi.id IS NOT NULL), '[]'::jsonb) AS items,
+         ${PICKUP_GROUPS_JSON}
        FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id
        WHERE o.id = $1 AND o.buyer_id = $2
        GROUP BY o.id`,
@@ -255,7 +315,8 @@ function createOrdersRepository(db) {
       `SELECT o.id, o.order_number, o.status, o.currency, o.buyer_name,
               o.pickup_scheduled_at, o.created_at, o.updated_at, o.paid_at, o.cancelled_at,
               sum(oi.total_cents)::integer AS seller_total_cents,
-              jsonb_agg(${ITEM_JSON} ORDER BY oi.created_at) AS items
+              jsonb_agg(${ITEM_JSON} ORDER BY oi.created_at) AS items,
+              ${sellerPickupGroupsJson(1)}
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.id AND oi.seller_user_id = $1
        GROUP BY o.id ORDER BY o.created_at DESC`,
@@ -269,7 +330,8 @@ function createOrdersRepository(db) {
       `SELECT o.id, o.order_number, o.status, o.currency, o.buyer_name,
               o.pickup_scheduled_at, o.created_at, o.updated_at, o.paid_at, o.cancelled_at,
               sum(oi.total_cents)::integer AS seller_total_cents,
-              jsonb_agg(${ITEM_JSON} ORDER BY oi.created_at) AS items
+              jsonb_agg(${ITEM_JSON} ORDER BY oi.created_at) AS items,
+              ${sellerPickupGroupsJson(2)}
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.id AND oi.seller_user_id = $2
        WHERE o.id = $1
@@ -443,6 +505,16 @@ function createOrdersRepository(db) {
     return result.rows[0].count;
   }
 
+  async function expirePickupGroups() {
+    const result = await db.query(
+      `UPDATE pickup_groups
+       SET status = 'expired', updated_at = now()
+       WHERE status = 'scheduled' AND deadline_at <= now()
+       RETURNING id`,
+    );
+    return result.rowCount || result.rows.length;
+  }
+
   return {
     getPendingByBuyer,
     createOrGetPending,
@@ -462,7 +534,76 @@ function createOrdersRepository(db) {
     listPendingCompensations,
     listExpiredPendingCheckouts,
     countPendingCompensations,
+    expirePickupGroups,
   };
+}
+
+async function createPickupGroups(client, order, paidAt) {
+  if (!order?.items?.length) return [];
+  const paidDate = new Date(paidAt || Date.now());
+  if (Number.isNaN(paidDate.getTime())) return [];
+  const deadline = calculatePickupDeadline(paidDate);
+  const groups = new Map();
+
+  for (const item of order.items) {
+    const point = parseJsonValue(item.pickup_point);
+    const schedules = parseJsonValue(item.pickup_schedules) || [];
+    if (!item.id || !item.seller_user_id
+      || !point?.name || !point.address_line || !point.city || !point.state || !point.postal_code) continue;
+    const window = findNextPickupWindow(schedules, paidDate, deadline);
+    if (!window) continue;
+    const pointId = item.pickup_point_id || point.id || null;
+    const key = [
+      item.seller_user_id,
+      pointId,
+      window.scheduledStart.toISOString(),
+      window.scheduledEnd.toISOString(),
+    ].join(':');
+    let group = groups.get(key);
+    if (!group) {
+      const result = await client.query(
+        `INSERT INTO pickup_groups
+           (order_id, seller_user_id, seller_name, pickup_point_id, point_name,
+            address_line, city, state, postal_code, reference,
+            scheduled_start_at, scheduled_end_at, deadline_at, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'scheduled')
+         ON CONFLICT (order_id, seller_user_id, pickup_point_id,
+                      scheduled_start_at, scheduled_end_at)
+         DO UPDATE SET seller_name = EXCLUDED.seller_name
+         RETURNING id`,
+        [order.id, item.seller_user_id, item.seller_name || 'Vendedor', pointId,
+          point.name, point.address_line, point.city, point.state, point.postal_code,
+          point.reference || null, window.scheduledStart, window.scheduledEnd, deadline],
+      );
+      group = { id: result.rows[0].id };
+      groups.set(key, group);
+    }
+    await client.query(
+      `INSERT INTO pickup_group_items (pickup_group_id, order_item_id)
+       VALUES ($1, $2)
+       ON CONFLICT (order_item_id) DO NOTHING`,
+      [group.id, item.id],
+    );
+  }
+
+  await client.query(
+    `UPDATE orders
+     SET pickup_scheduled_at = (
+       SELECT min(scheduled_start_at) FROM pickup_groups WHERE order_id = $1
+     ), updated_at = now()
+     WHERE id = $1`,
+    [order.id],
+  );
+  return [...groups.values()];
+}
+
+function parseJsonValue(value) {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }
 
 function validateCart(cart, buyerId) {
@@ -488,6 +629,13 @@ function normalizeOrder(row) {
       total_cents: Number(item.total_cents),
     }));
   }
+  if (typeof order.pickup_groups === 'string') {
+    try {
+      order.pickup_groups = JSON.parse(order.pickup_groups);
+    } catch {
+      order.pickup_groups = [];
+    }
+  }
   return order;
 }
 
@@ -495,7 +643,24 @@ function toPublicOrder(order) {
   const result = { ...order };
   delete result.checkout_url;
   delete result.checkout_session_id;
+  if (Array.isArray(result.items)) {
+    result.items = result.items.map(stripPickupItemSnapshot);
+  }
+  if (Array.isArray(result.pickup_groups)) {
+    result.pickup_groups = result.pickup_groups.map((group) => ({
+      ...group,
+      items: Array.isArray(group.items) ? group.items.map(stripPickupItemSnapshot) : [],
+    }));
+  }
   return result;
 }
 
-module.exports = { createOrdersRepository, validateCart };
+function stripPickupItemSnapshot(item) {
+  const result = { ...item };
+  delete result.pickup_point_id;
+  delete result.pickup_point;
+  delete result.pickup_schedules;
+  return result;
+}
+
+module.exports = { createOrdersRepository, createPickupGroups, validateCart };

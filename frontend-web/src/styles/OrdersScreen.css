@@ -15,6 +15,23 @@
 .order-right { display:flex; flex-direction:column; align-items:flex-end }
 .order-status { padding:6px 10px; border-radius:999px; font-weight:700; font-size:13px; margin-bottom:8px }
 .order-total { font-weight:700 }
+.pickup-groups { display:grid; gap:10px; margin-top:16px; }
+.pickup-groups > h3 { display:flex; align-items:center; gap:7px; color:#21613f; font-size:14px; }
+.pickup-order-card { padding:13px; border:1px solid #cfe8d8; border-radius:12px; background:#f6fcf7; }
+.pickup-order-card--expired { border-color:#fecaca; background:#fff7f7; }
+.pickup-order-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.pickup-order-card-head strong, .pickup-order-card-head span { display:block; }
+.pickup-order-card-head span { margin-top:3px; color:var(--color-text-muted); font-size:11px; }
+.pickup-order-status { padding:4px 7px; border-radius:999px; font-size:10px !important; font-weight:800; white-space:nowrap; }
+.pickup-order-status.scheduled { color:#166534 !important; background:#dcfce7; }
+.pickup-order-status.expired { color:#991b1b !important; background:#fee2e2; }
+.pickup-order-address { margin-top:9px; color:var(--color-text); font-size:12px; line-height:1.45; }
+.pickup-order-reference { margin-top:3px; color:var(--color-text-muted); font-size:11px; }
+.pickup-order-times { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; color:#1f5f3d; font-size:12px; font-weight:700; }
+.pickup-order-times span, .pickup-order-deadline { display:inline-flex; align-items:center; gap:5px; }
+.pickup-order-deadline { margin-top:9px; color:#9a3412; font-size:12px; font-weight:700; }
+.pickup-order-items { display:flex; flex-wrap:wrap; gap:5px; margin-top:10px; }
+.pickup-order-items span { padding:4px 6px; border-radius:6px; background:#fff; font-size:11px; }
 .order-status--pending_payment { background:#fef3c7; color:#92400e }
 .order-status--paid { background:#e0f2fe; color:#075985 }
 .order-status--preparing { background:#fff7ed; color:#9a3412 }
@@ -28,4 +45,6 @@
   .orders-body { padding: 20px }
   .order-row { align-items:flex-start; gap:16px }
   .order-right { min-width:120px }
+  .pickup-groups { width:100%; }
+  .pickup-order-card-head { flex-direction:column; }
 }

@@ -15,6 +15,12 @@ const {
   updateSellerProduct,
   updateSellerProductStatus,
 } = require('../services/seller-products');
+const {
+  createSellerPickupPoint,
+  listSellerPickupPoints,
+  updateSellerPickupPoint,
+  updateSellerPickupPointStatus,
+} = require('../services/pickup-points');
 
 const PRODUCT_STATUS_VALUES = ['draft', 'active', 'paused', 'sold', 'removed'];
 const sellerProductsQuery = z.object({
@@ -31,6 +37,53 @@ function createSellerRouter({ db, config = {}, storage, mutationRateLimit } = {}
   const mutate = mutationRateLimit ? [mutationRateLimit] : [];
 
   router.use(requireSeller);
+
+  router.get('/pickup-points', async (req, res, next) => {
+    try {
+      res.json(await listSellerPickupPoints(db, req.user));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/pickup-points', ...mutate, async (req, res, next) => {
+    try {
+      const pickupPoint = await createSellerPickupPoint(db, req.user, req.body);
+      res.status(201).json({ pickup_point: pickupPoint });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.patch('/pickup-points/:id/status', ...mutate, async (req, res, next) => {
+    try {
+      const pointId = parseUuid(req.params.id, 'El punto de venta no es válido.');
+      const input = parse(
+        z.object({ is_active: z.boolean() }),
+        req.body,
+        'El estado del punto no es válido.',
+      );
+      const pickupPoint = await updateSellerPickupPointStatus(
+        db,
+        req.user,
+        pointId,
+        input.is_active,
+      );
+      res.json({ pickup_point: pickupPoint });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.patch('/pickup-points/:id', ...mutate, async (req, res, next) => {
+    try {
+      const pointId = parseUuid(req.params.id, 'El punto de venta no es válido.');
+      const pickupPoint = await updateSellerPickupPoint(db, req.user, pointId, req.body);
+      res.json({ pickup_point: pickupPoint });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   router.get('/products', async (req, res, next) => {
     try {

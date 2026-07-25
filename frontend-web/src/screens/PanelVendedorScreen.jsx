@@ -23,6 +23,7 @@ import {
   addSellerProductImages,
   deleteSellerProductImage,
   getCategories,
+  getSellerPickupPoints,
   getSellerProducts,
   getSellerSales,
   reorderSellerProductImages,
@@ -50,6 +51,15 @@ const ORDER_STATUS_LABELS = {
   refunded: 'Reembolsado',
 }
 const CONDITIONS = ['nuevo', 'como nuevo', 'buen estado', 'usado', 'muy usado']
+const WEEK_DAYS = [
+  { value: 1, label: 'Lunes' },
+  { value: 2, label: 'Martes' },
+  { value: 3, label: 'Miércoles' },
+  { value: 4, label: 'Jueves' },
+  { value: 5, label: 'Viernes' },
+  { value: 6, label: 'Sábado' },
+  { value: 7, label: 'Domingo' },
+]
 
 export default function PanelVendedorScreen() {
   const { user, loading: authLoading } = useAuth()
@@ -61,6 +71,8 @@ export default function PanelVendedorScreen() {
   const [productStatus, setProductStatus] = useState('')
   const [productOffset, setProductOffset] = useState(0)
   const [categories, setCategories] = useState([])
+  const [pickupPoints, setPickupPoints] = useState([])
+  const [pickupPointsLoading, setPickupPointsLoading] = useState(true)
   const [sales, setSales] = useState(null)
   const [salesSearch, setSalesSearch] = useState('')
   const [salesOffset, setSalesOffset] = useState(0)
@@ -144,6 +156,16 @@ export default function PanelVendedorScreen() {
     return () => { mounted = false }
   }, [authLoading, user])
 
+  useEffect(() => {
+    if (authLoading || !user || user.role !== 'vendedor') return undefined
+    let mounted = true
+    getSellerPickupPoints()
+      .then((data) => { if (mounted) setPickupPoints(data) })
+      .catch(() => {})
+      .finally(() => { if (mounted) setPickupPointsLoading(false) })
+    return () => { mounted = false }
+  }, [authLoading, user])
+
   const activeProduct = useMemo(
     () => products.find((product) => product.id === selectedProduct?.id) || selectedProduct,
     [products, selectedProduct],
@@ -192,6 +214,34 @@ export default function PanelVendedorScreen() {
     }))
   }
 
+  function updateEditSchedule(index, field, value) {
+    setEditForm((current) => ({
+      ...current,
+      pickup_schedules: current.pickup_schedules.map((schedule, scheduleIndex) => (
+        scheduleIndex === index
+          ? { ...schedule, [field]: field === 'day_of_week' ? Number(value) : value }
+          : schedule
+      )),
+    }))
+  }
+
+  function addEditSchedule() {
+    setEditForm((current) => ({
+      ...current,
+      pickup_schedules: [
+        ...current.pickup_schedules,
+        { day_of_week: 1, start_time: '10:00', end_time: '14:00' },
+      ],
+    }))
+  }
+
+  function removeEditSchedule(index) {
+    setEditForm((current) => ({
+      ...current,
+      pickup_schedules: current.pickup_schedules.filter((_, scheduleIndex) => scheduleIndex !== index),
+    }))
+  }
+
   async function runAction(key, action, successMessage, refresh = true) {
     setBusy(key)
     setFeedback(null)
@@ -227,6 +277,8 @@ export default function PanelVendedorScreen() {
         condition: editForm.condition,
         price_mxn: editForm.price,
         category_id: editForm.category_id,
+        pickup_point_id: editForm.pickup_point_id || null,
+        pickup_schedules: editForm.pickup_schedules,
         variants: editForm.variants.map((variant) => ({
           id: variant.id,
           size_name: variant.size_name.trim(),
@@ -384,6 +436,8 @@ export default function PanelVendedorScreen() {
               <label>Condición<select value={editForm.condition} onChange={(event) => setFormField('condition', event.target.value)} disabled={Boolean(busy)}>{CONDITIONS.map((condition) => <option key={condition} value={condition}>{condition}</option>)}</select></label>
               <label>Precio (MXN)<input type="number" min="0.01" step="0.01" value={editForm.price} onChange={(event) => setFormField('price', event.target.value)} disabled={Boolean(busy)} required /></label>
               <label>Categoría<select value={editForm.category_id} onChange={(event) => setFormField('category_id', event.target.value)} disabled={Boolean(busy)}>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+              <label>Punto de venta<select value={editForm.pickup_point_id} onChange={(event) => setFormField('pickup_point_id', event.target.value)} disabled={Boolean(busy) || pickupPointsLoading} required><option value="">Selecciona un punto activo</option>{pickupPoints.filter((point) => point.is_active).map((point) => <option key={point.id} value={point.id}>{point.name} · {point.city}, {point.state}</option>)}</select></label>
+              <div className="edit-pickup-schedules"><div className="edit-label-row"><span>Horarios de recogida</span><button type="button" onClick={addEditSchedule} disabled={Boolean(busy)}><Plus size={14} /> Agregar</button></div>{editForm.pickup_schedules.map((schedule, index) => <div className="edit-pickup-schedule-row" key={`${index}-${schedule.day_of_week}-${schedule.start_time}`}><select aria-label={`Día del horario de edición ${index + 1}`} value={schedule.day_of_week} onChange={(event) => updateEditSchedule(index, 'day_of_week', event.target.value)} disabled={Boolean(busy)}>{WEEK_DAYS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}</select><input type="time" value={schedule.start_time} onChange={(event) => updateEditSchedule(index, 'start_time', event.target.value)} disabled={Boolean(busy)} required /><input type="time" value={schedule.end_time} onChange={(event) => updateEditSchedule(index, 'end_time', event.target.value)} disabled={Boolean(busy)} required /><button type="button" onClick={() => removeEditSchedule(index)} disabled={Boolean(busy)} aria-label="Eliminar horario"><Trash2 size={15} /></button></div>)}</div>
               <div className="edit-variants"><div className="edit-label-row"><span>Variantes y stock</span><button type="button" onClick={addEditVariant} disabled={Boolean(busy)}><Plus size={14} /> Agregar</button></div>{editForm.variants.map((variant, index) => <div className="edit-variant-row" key={variant.id || `new-${index}`}><input value={variant.size_name} onChange={(event) => updateEditVariant(index, 'size_name', event.target.value)} placeholder="Talla" disabled={Boolean(busy)} required /><input type="number" min="0" value={variant.stock} onChange={(event) => updateEditVariant(index, 'stock', event.target.value)} placeholder="Stock" disabled={Boolean(busy)} required /><button type="button" onClick={() => removeEditVariant(index)} disabled={Boolean(busy) || editForm.variants.length <= 1} aria-label="Eliminar variante"><Trash2 size={15} /></button></div>)}</div>
               <button className="panel-save-button" type="submit" disabled={Boolean(busy)}>{busy === `edit-${activeProduct.id}` ? 'Guardando...' : <><Check size={16} /> Guardar cambios</>}</button>
             </form>
@@ -406,10 +460,11 @@ export default function PanelVendedorScreen() {
 }
 
 function SellerProductRow({ product, busy, onEdit, onStatus }) {
+  const pickupIncomplete = product.pickup_configuration_status !== 'complete'
   return (
     <article className="seller-product-row">
       <img className="seller-product-thumb" src={product.images?.[0]?.url || ''} alt="" />
-      <div className="seller-product-main"><div className="seller-product-title"><h3>{product.name}</h3><span className={`seller-status seller-status-${product.status}`}>{STATUS_LABELS[product.status] || product.status}</span></div><p>{product.category?.name || 'Sin categoría'} · {product.variants?.length || 0} variantes · {Number(product.total_stock || 0)} unidades</p><strong>{formatMoney(product.price_cents)}</strong></div>
+      <div className="seller-product-main"><div className="seller-product-title"><h3>{product.name}</h3><span className={`seller-status seller-status-${product.status}`}>{STATUS_LABELS[product.status] || product.status}</span>{pickupIncomplete && <span className="seller-status seller-status-pickup">Recogida pendiente</span>}</div><p>{product.category?.name || 'Sin categoría'} · {product.variants?.length || 0} variantes · {Number(product.total_stock || 0)} unidades</p><small className="seller-product-pickup">{product.pickup_point?.name || 'Sin punto de venta'} · {(product.pickup_schedules || []).length} horario(s)</small><strong>{formatMoney(product.price_cents)}</strong></div>
       <div className="seller-product-actions"><button onClick={onEdit} disabled={Boolean(busy)}><Edit3 size={14} /> Editar</button>{product.status === 'active' && <button onClick={() => onStatus(product, 'paused')} disabled={Boolean(busy)}><Pause size={14} /> Pausar</button>}{product.status === 'paused' && <button onClick={() => onStatus(product, 'active')} disabled={Boolean(busy)}><Play size={14} /> Reactivar</button>}{product.status !== 'removed' && <button className="danger-action" onClick={() => onStatus(product, 'removed')} disabled={Boolean(busy)}><Trash2 size={14} /> Retirar</button>}</div>
     </article>
   )
@@ -446,6 +501,13 @@ function toEditForm(product) {
     condition: product.condition || 'buen estado',
     price: (Number(product.price_cents || 0) / 100).toFixed(2),
     category_id: product.category?.id || '',
+    pickup_point_id: product.pickup_point?.id || product.pickup_point_id || '',
+    pickup_schedules: (product.pickup_schedules || []).map((schedule) => ({
+      id: schedule.id,
+      day_of_week: Number(schedule.day_of_week),
+      start_time: schedule.start_time,
+      end_time: schedule.end_time,
+    })),
     variants: (product.variants || []).map((variant) => ({
       id: variant.id,
       size_name: variant.size_name,

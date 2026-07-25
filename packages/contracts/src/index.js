@@ -38,6 +38,23 @@ const CartItemSnapshotSchema = z.object({
   unit_price_cents: z.number().int().nonnegative(),
   currency: z.string().length(3),
   image_url: z.string().nullable().optional(),
+  pickup_point_id: uuid.optional(),
+  pickup_point: z.object({
+    id: uuid.optional(),
+    name: z.string().min(1),
+    address_line: z.string().optional(),
+    city: z.string().min(1),
+    state: z.string().min(1),
+    postal_code: z.string().optional(),
+    reference: z.string().nullable().optional(),
+  }).nullable().optional(),
+  pickup_schedules: z.array(z.object({
+    id: uuid.optional(),
+    day_of_week: z.number().int().min(1).max(7),
+    start_time: z.string().min(1),
+    end_time: z.string().min(1),
+    timezone: z.string().default('America/Monterrey'),
+  })).optional(),
 });
 
 const CartSnapshotSchema = z.object({

@@ -216,6 +216,19 @@ export default function Sidebar({ abierto, onCerrar }) {
             </NavLink>
           )}
 
+          {usuario?.role === 'vendedor' && (
+            <NavLink
+              to="/mis-direcciones"
+              onClick={onCerrar}
+              className={({ isActive }) =>
+                isActive ? 'nav-item nav-item-sm active' : 'nav-item nav-item-sm'
+              }
+            >
+              <Store size={15} />
+              Mis direcciones
+            </NavLink>
+          )}
+
           {!usuario && (
             <NavLink
               to="/vender"

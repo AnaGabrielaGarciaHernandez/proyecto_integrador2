@@ -53,12 +53,42 @@ async function reserveInventory(db, input, correlationId) {
          sp.display_name AS seller_name,
          sp.status AS seller_status,
          ur.role AS seller_role,
-         ur.is_active AS seller_is_active
+         ur.is_active AS seller_is_active,
+         p.pickup_point_id,
+         CASE WHEN spp.id IS NULL THEN NULL ELSE json_build_object(
+           'id', spp.id,
+           'name', spp.name,
+           'address_line', spp.address_line,
+           'city', spp.city,
+           'state', spp.state,
+           'postal_code', spp.postal_code,
+           'reference', spp.reference
+         ) END AS pickup_point,
+         COALESCE(pickup_schedules.schedules, '[]'::json) AS pickup_schedules
        FROM product_variants pv
        JOIN products p ON p.id = pv.product_id
        JOIN seller_profiles sp ON sp.id = p.seller_id
        JOIN user_role_projection ur ON ur.user_id = sp.user_id
+       JOIN seller_pickup_points spp
+         ON spp.id = p.pickup_point_id AND spp.is_active IS TRUE
+       JOIN LATERAL (
+         SELECT json_agg(
+           json_build_object(
+             'id', pps.id,
+             'day_of_week', pps.day_of_week,
+             'start_time', to_char(pps.start_time, 'HH24:MI'),
+             'end_time', to_char(pps.end_time, 'HH24:MI'),
+             'timezone', pps.timezone
+           ) ORDER BY pps.day_of_week, pps.start_time
+         ) AS schedules
+         FROM product_pickup_schedules pps
+         WHERE pps.product_id = p.id
+       ) pickup_schedules ON true
        WHERE pv.id = ANY($1::uuid[])
+         AND EXISTS (
+           SELECT 1 FROM product_pickup_schedules available_schedule
+           WHERE available_schedule.product_id = p.id
+         )
        ORDER BY pv.id
        FOR UPDATE OF pv`,
       [ids],
@@ -92,12 +122,16 @@ async function reserveInventory(db, input, correlationId) {
       );
       await client.query(
         `INSERT INTO inventory_reservation_items
-           (order_id, variant_id, product_id, seller_id, seller_user_id, product_name,
-            size_name, seller_name, quantity, unit_price_cents, currency)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+         (order_id, variant_id, product_id, seller_id, seller_user_id, product_name,
+            size_name, seller_name, quantity, unit_price_cents, currency,
+            pickup_point_id, pickup_point_snapshot, pickup_schedules)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb)`,
         [input.order_id, variant.variant_id, variant.product_id, variant.seller_id,
           variant.seller_user_id, variant.product_name, variant.size_name, variant.seller_name,
-          requested.quantity, variant.unit_price_cents, variant.currency],
+          requested.quantity, variant.unit_price_cents, variant.currency,
+          variant.pickup_point_id || null,
+          JSON.stringify(variant.pickup_point || null),
+          JSON.stringify(variant.pickup_schedules || [])],
       );
     }
 
@@ -223,7 +257,8 @@ async function loadReservation(client, orderId) {
   if (!result.rows[0]) throw createHttpError('Inventory reservation not found', 404);
   const items = await client.query(
     `SELECT variant_id, product_id, seller_id, seller_user_id, product_name,
-            size_name, seller_name, quantity::integer, unit_price_cents::integer, currency
+            size_name, seller_name, quantity::integer, unit_price_cents::integer, currency,
+            pickup_point_id, pickup_point_snapshot AS pickup_point, pickup_schedules
      FROM inventory_reservation_items
      WHERE order_id = $1
      ORDER BY variant_id`,

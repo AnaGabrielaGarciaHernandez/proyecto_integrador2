@@ -8,6 +8,9 @@ function startCompensationWorker({ orders, checkoutService, paymentClient, inter
     if (running || stopped) return;
     running = true;
     try {
+      if (typeof orders.expirePickupGroups === 'function') {
+        await orders.expirePickupGroups();
+      }
       if (paymentClient && typeof orders.listExpiredPendingCheckouts === 'function') {
         await reconcileExpiredCheckouts({ orders, checkoutService, paymentClient });
       }

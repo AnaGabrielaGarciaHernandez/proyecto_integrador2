@@ -282,16 +282,18 @@ export default function CuentaScreen() {
                 <ChevronRight size={16} className="cuenta-opcion-arrow" />
               </button>
 
-              <button className="cuenta-opcion">
-                <div className="cuenta-opcion-icono" style={{ background: '#ede9fe' }}>
-                  <MapPin size={20} color="#8b5cf6" />
-                </div>
-                <div className="cuenta-opcion-texto">
-                  <h3>Mis direcciones</h3>
-                  <p>Gestiona tus puntos de entrega</p>
-                </div>
-                <ChevronRight size={16} className="cuenta-opcion-arrow" />
-              </button>
+              {usuario.role === 'vendedor' && (
+                <button className="cuenta-opcion" onClick={() => navigate('/mis-direcciones')}>
+                  <div className="cuenta-opcion-icono" style={{ background: '#ede9fe' }}>
+                    <MapPin size={20} color="#8b5cf6" />
+                  </div>
+                  <div className="cuenta-opcion-texto">
+                    <h3>Mis direcciones</h3>
+                    <p>Gestiona tus puntos de venta</p>
+                  </div>
+                  <ChevronRight size={16} className="cuenta-opcion-arrow" />
+                </button>
+              )}
 
               {usuario.role === 'vendedor' && (
                 <button

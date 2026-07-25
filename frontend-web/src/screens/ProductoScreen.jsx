@@ -316,7 +316,8 @@ export default function ProductoScreen() {
 
             <div className="entrega-texto">
               <h4>{producto.entrega}</h4>
-              <p>{producto.direccion}</p>
+              <p>{producto.pickupPoint?.name ? `${producto.pickupPoint.name} · ${producto.pickupPoint.city}, ${producto.pickupPoint.state}` : producto.direccion}</p>
+              <small>La dirección exacta y las referencias estarán disponibles después de pagar.</small>
             </div>
 
           </div>

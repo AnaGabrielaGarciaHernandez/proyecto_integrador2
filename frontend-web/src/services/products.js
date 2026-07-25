@@ -66,13 +66,14 @@ export function mapProduct(product) {
     isWishlisted: product.is_wishlisted === true,
     wishlistedAt: product.wishlisted_at || null,
     agotadoTemporalmente: temporarilyUnavailable,
+    pickupPoint: product.pickup_point,
     tipo: temporarilyUnavailable
       ? 'Sold out'
       : availabilityStatus === 'available'
         ? 'Disponible'
         : null,
-    entrega: 'Entrega presencial',
-    direccion: product.bazaar?.name || 'Durango, Dgo.',
+    entrega: 'Recogida presencial',
+    direccion: 'La dirección exacta se mostrará en Mis pedidos después del pago.',
   }
 }
 

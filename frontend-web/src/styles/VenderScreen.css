@@ -60,6 +60,16 @@
 .image-preview-actions button { display: inline-flex; align-items: center; justify-content: center; width: 27px; height: 27px; border-radius: 6px; color: #fff; background: rgba(15,28,20,.78); }
 .image-preview-actions button:disabled { cursor: not-allowed; opacity: .4; }
 .vender-category-section { margin-top: 0; }
+.pickup-product-section { border-color: #cfe8d8; background: linear-gradient(135deg, #fbfffc 0%, #fff 100%); }
+.pickup-manage-link { color: #167044; background: #e6f6ec; }
+.pickup-form-warning { display:flex; align-items:flex-start; gap:8px; margin:4px 0 14px; padding:11px 12px; border-radius:10px; background:#fff7ed; color:#9a3412; font-size:13px; line-height:1.45; }
+.pickup-form-warning a { color:#166534; font-weight:800; text-decoration:underline; }
+.pickup-schedules-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:18px; margin-bottom:8px; color:var(--color-text); font-size:13px; font-weight:800; }
+.pickup-schedules-editor { display:grid; gap:8px; }
+.pickup-schedule-row { display:grid; grid-template-columns:1.3fr 1fr 1fr auto; gap:8px; align-items:end; padding:10px; border:1px solid #e0e9e1; border-radius:10px; background:#f7fbf8; }
+.pickup-schedule-row label { display:grid; gap:5px; color:var(--color-text-muted); font-size:11px; font-weight:700; }
+.pickup-schedule-row select, .pickup-schedule-row input { min-height:36px; padding:7px 9px; border:1px solid #d6ddd6; border-radius:8px; background:#fff; color:var(--color-text); font:inherit; font-size:13px; }
+.pickup-schedule-row .icon-button { margin-bottom:1px; }
 .vender-status-loading { padding: 24px 0; color: var(--color-text-muted); }
 .vender-pitch { max-width: 760px; padding: 28px; border: 1px solid #d8efe0; border-radius: 18px; background: linear-gradient(135deg, #f1fbf4 0%, #fffdf8 100%); }
 .vender-pitch-eyebrow { margin-bottom: 8px; color: var(--color-accent); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
@@ -93,4 +103,7 @@
   .image-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .vender-actions { justify-content: stretch; }
   .vender-actions > * { flex: 1; text-align: center; }
+  .pickup-schedules-heading { align-items:flex-start; flex-direction:column; }
+  .pickup-schedule-row { grid-template-columns:1fr 1fr auto; }
+  .pickup-schedule-row select { grid-column:1/-1; }
 }

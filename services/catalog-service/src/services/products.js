@@ -71,6 +71,17 @@ async function resolveVariants(db, variantIds, buyerId = null) {
        sp.status AS seller_status,
        ur.role AS seller_role,
        ur.is_active AS seller_is_active,
+       p.pickup_point_id,
+       CASE WHEN spp.id IS NULL THEN NULL ELSE json_build_object(
+         'id', spp.id,
+         'name', spp.name,
+         'address_line', spp.address_line,
+         'city', spp.city,
+         'state', spp.state,
+         'postal_code', spp.postal_code,
+         'reference', spp.reference
+       ) END AS pickup_point,
+       COALESCE(pickup_schedules.schedules, '[]'::json) AS pickup_schedules,
        COALESCE(buyer_reservation.reserved_quantity, 0)::integer
          AS buyer_reserved_quantity,
        cover.cover_image
@@ -78,6 +89,21 @@ async function resolveVariants(db, variantIds, buyerId = null) {
      JOIN products p ON p.id = pv.product_id
      JOIN seller_profiles sp ON sp.id = p.seller_id
      JOIN user_role_projection ur ON ur.user_id = sp.user_id
+     LEFT JOIN seller_pickup_points spp
+       ON spp.id = p.pickup_point_id AND spp.is_active IS TRUE
+     LEFT JOIN LATERAL (
+       SELECT json_agg(
+         json_build_object(
+           'id', pps.id,
+           'day_of_week', pps.day_of_week,
+           'start_time', to_char(pps.start_time, 'HH24:MI'),
+           'end_time', to_char(pps.end_time, 'HH24:MI'),
+           'timezone', pps.timezone
+         ) ORDER BY pps.day_of_week, pps.start_time
+       ) AS schedules
+       FROM product_pickup_schedules pps
+       WHERE pps.product_id = p.id
+     ) pickup_schedules ON true
      LEFT JOIN LATERAL (
        SELECT sum(reserved.quantity)::integer AS reserved_quantity
        FROM inventory_reservation_items reserved
@@ -107,7 +133,7 @@ async function resolveVariants(db, variantIds, buyerId = null) {
   return result.rows;
 }
 
-function productSelect({ detail = false, userIdParameter = null } = {}) {
+function productSelect({ detail = false, userIdParameter = null, includePickupAddress = false } = {}) {
   return `SELECT
     p.id,
     p.name,
@@ -136,6 +162,27 @@ function productSelect({ detail = false, userIdParameter = null } = {}) {
       'name', b.name
       ${detail ? ", 'description', b.description" : ''}
     ) END AS bazaar,
+    p.pickup_point_id,
+    CASE WHEN spp.id IS NULL THEN NULL ELSE json_build_object(
+      'id', spp.id,
+      'name', spp.name,
+      'city', spp.city,
+      'state', spp.state
+      ${includePickupAddress
+        ? ", 'address_line', spp.address_line, 'postal_code', spp.postal_code, 'reference', spp.reference"
+        : ''}
+    ) END AS pickup_point,
+    COALESCE(pickup_schedules.schedules, '[]'::json) AS pickup_schedules,
+    CASE
+      WHEN spp.id IS NOT NULL
+        AND spp.is_active IS TRUE
+        AND EXISTS (
+          SELECT 1 FROM product_pickup_schedules ready_schedule
+          WHERE ready_schedule.product_id = p.id
+        )
+        THEN 'complete'
+      ELSE 'incomplete'
+    END AS pickup_configuration_status,
     COALESCE(variants.variants, '[]'::json) AS variants,
     COALESCE(images.images, '[]'::json) AS images,
     COALESCE(variants.total_stock, 0)::integer AS total_stock,
@@ -150,6 +197,20 @@ function productSelect({ detail = false, userIdParameter = null } = {}) {
   JOIN seller_profiles sp ON sp.id = p.seller_id
   JOIN user_role_projection ur ON ur.user_id = sp.user_id
   LEFT JOIN bazaars b ON b.id = p.bazaar_id
+  LEFT JOIN seller_pickup_points spp ON spp.id = p.pickup_point_id
+  LEFT JOIN LATERAL (
+    SELECT json_agg(
+      json_build_object(
+        'id', pps.id,
+        'day_of_week', pps.day_of_week,
+        'start_time', to_char(pps.start_time, 'HH24:MI'),
+        'end_time', to_char(pps.end_time, 'HH24:MI'),
+        'timezone', pps.timezone
+      ) ORDER BY pps.day_of_week, pps.start_time
+    ) AS schedules
+    FROM product_pickup_schedules pps
+    WHERE pps.product_id = p.id
+  ) pickup_schedules ON true
   LEFT JOIN LATERAL (
     SELECT
       json_agg(
@@ -190,6 +251,14 @@ function productAvailabilityFilter() {
   return `(
     COALESCE(variants.total_stock, 0) > 0
     OR COALESCE(active_reservation.has_active_reservation, false)
+  )
+  AND (
+    p.pickup_point_id IS NOT NULL
+    AND spp.is_active IS TRUE
+    AND EXISTS (
+      SELECT 1 FROM product_pickup_schedules available_schedule
+      WHERE available_schedule.product_id = p.id
+    )
   )`;
 }
 

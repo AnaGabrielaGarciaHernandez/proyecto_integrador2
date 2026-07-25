@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AlertTriangle, CalendarDays, Clock, MapPin } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import { getOrdersForUser } from '../services/orders'
 import '../styles/OrdersScreen.css'
@@ -53,6 +54,12 @@ export default function OrdersScreen() {
                   <span key={item.id}>{item.quantity} × {item.product_name} · {item.size_name}</span>
                 ))}
               </div>
+              {user.role !== 'vendedor' && o.pickup_groups?.length > 0 && (
+                <div className="pickup-groups" aria-label="Datos de recogida">
+                  <h3><MapPin size={16} /> Recogida de tu pedido</h3>
+                  {o.pickup_groups.map((group) => <PickupGroupCard key={group.id} group={group} />)}
+                </div>
+              )}
             </div>
 
             <div className="order-right">
@@ -63,6 +70,26 @@ export default function OrdersScreen() {
         ))}
       </div>
     </div>
+  )
+}
+
+function PickupGroupCard({ group }) {
+  const expired = group.status === 'expired'
+  return (
+    <article className={`pickup-order-card ${expired ? 'pickup-order-card--expired' : ''}`}>
+      <div className="pickup-order-card-head">
+        <div><strong>{group.point?.name || 'Punto de recogida'}</strong><span>Vendedor: {group.seller_name || 'Vendedor'}</span></div>
+        <span className={`pickup-order-status ${expired ? 'expired' : 'scheduled'}`}>{expired ? 'Recogida vencida' : 'Programada'}</span>
+      </div>
+      <p className="pickup-order-address">{group.point?.address_line}, {group.point?.city}, {group.point?.state}, C.P. {group.point?.postal_code}</p>
+      {group.point?.reference && <p className="pickup-order-reference">Referencia: {group.point.reference}</p>}
+      <div className="pickup-order-times">
+        <span><CalendarDays size={14} /> {formatPickupDate(group.scheduled_start_at)}</span>
+        <span><Clock size={14} /> {formatPickupTime(group.scheduled_start_at)} – {formatPickupTime(group.scheduled_end_at)}</span>
+      </div>
+      <p className="pickup-order-deadline"><AlertTriangle size={14} /> Fecha límite: {formatPickupDateTime(group.deadline_at)}</p>
+      <div className="pickup-order-items">{(group.items || []).map((item) => <span key={item.id}>{item.quantity} × {item.product_name} · {item.size_name}</span>)}</div>
+    </article>
   )
 }
 
@@ -82,4 +109,22 @@ function formatMoney(cents, currency = 'MXN') {
 
 function formatDate(date) {
   return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(date))
+}
+
+function formatPickupDate(value) {
+  return formatPickup(value, { dateStyle: 'long' })
+}
+
+function formatPickupDateTime(value) {
+  return formatPickup(value, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function formatPickupTime(value) {
+  return formatPickup(value, { timeStyle: 'short' })
+}
+
+function formatPickup(value, options) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Fecha no disponible'
+  return new Intl.DateTimeFormat('es-MX', { ...options, timeZone: 'America/Monterrey' }).format(date)
 }

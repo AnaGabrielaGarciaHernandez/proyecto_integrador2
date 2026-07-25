@@ -1,63 +1,137 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { User, Mail, Lock, Eye, EyeOff, ChevronRight } from 'lucide-react'
+import {
+  User,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ChevronRight,
+  ImagePlus,
+} from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import { hasGoogleClientId } from '../services/googleAuth'
 import GoogleLoginButton from '../components/GoogleLoginButton'
-import { DEFAULT_AVATAR_URL } from '../constants/avatar'
+import { createAvatarPreview, validateAvatarFile } from '../services/avatar'
 import '../styles/RegistroScreen.css'
-
-const REAL_AVATARS = [
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=200&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
-  'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=200&q=80',
-  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=200&q=80',
-]
 
 export default function RegistroScreen() {
   const navigate = useNavigate()
-  const { register, loginWithGoogleToken } = useAuth()
-  const [paso, setPaso]             = useState(1)
-  const [nombre, setNombre]         = useState('')
-  const [correo, setCorreo]         = useState('')
+  const { register, loginWithGoogleToken, updateProfile } = useAuth()
+  const [nombre, setNombre] = useState('')
+  const [correo, setCorreo] = useState('')
   const [contrasena, setContrasena] = useState('')
-  const [verPass, setVerPass]       = useState(false)
-  const [avatarUrl, setAvatarUrl]   = useState(null)
-  const [toast, setToast]           = useState(false)
-  const [error, setError]           = useState('')
-  const [cargando, setCargando]     = useState(false)
+  const [verPass, setVerPass] = useState(false)
+  const [mostrarAvatarModal, setMostrarAvatarModal] = useState(false)
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('')
+  const [avatarError, setAvatarError] = useState('')
+  const [avatarCargando, setAvatarCargando] = useState(false)
+  const [toast, setToast] = useState(false)
+  const [error, setError] = useState('')
+  const [cargando, setCargando] = useState(false)
+  const avatarInputRef = useRef(null)
+  const avatarPreviewRef = useRef(null)
+  const modalRef = useRef(null)
+  const toastTimerRef = useRef(null)
 
-  function handleContinuar() {
-    if (!nombre || !correo || !contrasena) {
+  useEffect(() => () => {
+    if (avatarPreviewRef.current) URL.revokeObjectURL(avatarPreviewRef.current)
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+  }, [])
+
+  useEffect(() => {
+    if (mostrarAvatarModal) modalRef.current?.focus()
+  }, [mostrarAvatarModal])
+
+  function releaseAvatarPreview() {
+    if (avatarPreviewRef.current) {
+      URL.revokeObjectURL(avatarPreviewRef.current)
+      avatarPreviewRef.current = null
+    }
+  }
+
+  function resetAvatarSelection() {
+    releaseAvatarPreview()
+    setAvatarFile(null)
+    setAvatarPreviewUrl('')
+    setAvatarError('')
+    if (avatarInputRef.current) avatarInputRef.current.value = ''
+  }
+
+  function finishRegistration() {
+    setMostrarAvatarModal(false)
+    resetAvatarSelection()
+    setToast(true)
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = setTimeout(() => {
+      setToast(false)
+      navigate('/')
+    }, 1200)
+  }
+
+  async function handleRegistrar() {
+    if (!nombre.trim() || !correo.trim() || !contrasena) {
       setError('Por favor completa todos los campos.')
       return
     }
-    setError('')
-    setPaso(2)
-  }
 
-  async function handleConfirmar() {
     try {
       setCargando(true)
       setError('')
       await register({
-        full_name: nombre,
-        email: correo,
+        full_name: nombre.trim(),
+        email: correo.trim(),
         password: contrasena,
-        avatar_url: avatarUrl || null,
       })
-      setToast(true)
-      setTimeout(() => {
-        setToast(false)
-        navigate('/')
-      }, 1200)
+      setMostrarAvatarModal(true)
     } catch (err) {
       setError(err.message || 'No se pudo crear la cuenta.')
-      setPaso(1)
     } finally {
       setCargando(false)
+    }
+  }
+
+  function handleOpenAvatarPicker() {
+    if (!avatarCargando) avatarInputRef.current?.click()
+  }
+
+  function handleAvatarFileSelected(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    try {
+      const validatedFile = validateAvatarFile(file)
+      const previewUrl = createAvatarPreview(validatedFile)
+      releaseAvatarPreview()
+      avatarPreviewRef.current = previewUrl
+      setAvatarFile(validatedFile)
+      setAvatarPreviewUrl(previewUrl)
+      setAvatarError('')
+    } catch (err) {
+      setAvatarError(err.message || 'No se pudo leer la foto seleccionada.')
+    }
+  }
+
+  async function handleAvatarContinue() {
+    if (!avatarFile) {
+      handleOpenAvatarPicker()
+      return
+    }
+
+    try {
+      setAvatarCargando(true)
+      setAvatarError('')
+      await updateProfile({
+        full_name: nombre.trim(),
+        avatar: avatarFile,
+      })
+      finishRegistration()
+    } catch (err) {
+      setAvatarError(err.message || 'No se pudo guardar tu foto de perfil.')
+    } finally {
+      setAvatarCargando(false)
     }
   }
 
@@ -72,61 +146,6 @@ export default function RegistroScreen() {
     } finally {
       setCargando(false)
     }
-  }
-
-  if (paso === 2) {
-    return (
-      <div>
-        <div className="emoji-hero">
-          <h1>Elige tu foto</h1>
-          <p>Este será tu avatar en EcoBazar</p>
-        </div>
-
-        <div className="emoji-body">
-          <div className="emoji-grid">
-            <button
-              className={`emoji-item ${avatarUrl === null ? 'seleccionado' : ''}`}
-              onClick={() => setAvatarUrl(null)}
-              type="button"
-            >
-              <img src={DEFAULT_AVATAR_URL} alt="Avatar predeterminado" className="emoji-avatar-photo" />
-            </button>
-            {REAL_AVATARS.map((photo) => (
-              <button
-                key={photo}
-                className={`emoji-item ${photo === avatarUrl ? 'seleccionado' : ''}`}
-                onClick={() => setAvatarUrl(photo)}
-                type="button"
-              >
-                <img src={photo} alt="Avatar de perfil" className="emoji-avatar-photo" />
-              </button>
-            ))}
-          </div>
-
-          <div className="emoji-preview">
-            <div className="emoji-preview-avatar">
-              <img src={avatarUrl || DEFAULT_AVATAR_URL} alt="Vista previa" className="emoji-avatar-photo" />
-            </div>
-            <div className="emoji-preview-info">
-              <p>{nombre || 'Tu nombre'}</p>
-              <span>Vista previa de tu perfil</span>
-            </div>
-          </div>
-
-          {error && <div className="login-error">{error}</div>}
-
-          <button className="btn-confirmar" onClick={handleConfirmar} disabled={cargando}>
-            {cargando ? 'Creando cuenta...' : 'Confirmar y crear cuenta'} <ChevronRight size={18} />
-          </button>
-        </div>
-
-        {toast && (
-          <div className="toast-bienvenida">
-            ¡Bienvenido a EcoBazar, {nombre}!
-          </div>
-        )}
-      </div>
-    )
   }
 
   return (
@@ -159,7 +178,7 @@ export default function RegistroScreen() {
           <div className="login-separador-linea" />
         </div>
 
-        {error && <div className="login-error">{error}</div>}
+        {error && <div className="login-error" role="alert">{error}</div>}
 
         <div className="login-campos">
           <div className="input-wrapper">
@@ -168,7 +187,7 @@ export default function RegistroScreen() {
               type="text"
               placeholder="Nombre completo"
               value={nombre}
-              onChange={e => setNombre(e.target.value)}
+              onChange={(event) => setNombre(event.target.value)}
             />
           </div>
           <div className="input-wrapper">
@@ -177,7 +196,7 @@ export default function RegistroScreen() {
               type="email"
               placeholder="Correo electrónico"
               value={correo}
-              onChange={e => setCorreo(e.target.value)}
+              onChange={(event) => setCorreo(event.target.value)}
             />
           </div>
           <div className="input-wrapper">
@@ -186,9 +205,14 @@ export default function RegistroScreen() {
               type={verPass ? 'text' : 'password'}
               placeholder="Contraseña"
               value={contrasena}
-              onChange={e => setContrasena(e.target.value)}
+              onChange={(event) => setContrasena(event.target.value)}
             />
-            <button className="btn-ojo" onClick={() => setVerPass(!verPass)}>
+            <button
+              className="btn-ojo"
+              type="button"
+              onClick={() => setVerPass(!verPass)}
+              aria-label={verPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            >
               {verPass ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
@@ -200,8 +224,13 @@ export default function RegistroScreen() {
           <a href="#">Política de privacidad</a>.
         </p>
 
-        <button className="btn-login-principal" onClick={handleContinuar}>
-          Continuar — elegir foto <ChevronRight size={16} />
+        <button
+          className="btn-login-principal"
+          type="button"
+          onClick={handleRegistrar}
+          disabled={cargando}
+        >
+          {cargando ? 'Creando cuenta...' : 'Crear cuenta'} <ChevronRight size={16} />
         </button>
 
         <p className="registro-login">
@@ -209,6 +238,86 @@ export default function RegistroScreen() {
         </p>
 
       </div>
+
+      {mostrarAvatarModal && (
+        <div className="registro-avatar-modal-overlay">
+          <div
+            ref={modalRef}
+            className="registro-avatar-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="registro-avatar-modal-title"
+            tabIndex="-1"
+          >
+            <h2 id="registro-avatar-modal-title">¿Quieres agregar una foto de perfil?</h2>
+            <p className="registro-avatar-modal-subtitle">
+              Personaliza tu cuenta ahora o puedes hacerlo más tarde.
+            </p>
+
+            <div className={`registro-avatar-preview ${avatarPreviewUrl ? 'con-foto' : ''}`}>
+              {avatarPreviewUrl ? (
+                <img src={avatarPreviewUrl} alt="Vista previa de tu foto de perfil" />
+              ) : (
+                <div className="registro-avatar-preview-vacia">
+                  <ImagePlus size={34} aria-hidden="true" />
+                  <span>Sin foto seleccionada</span>
+                </div>
+              )}
+            </div>
+
+            <input
+              ref={avatarInputRef}
+              className="registro-avatar-file-input"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleAvatarFileSelected}
+              aria-label="Seleccionar foto de perfil"
+            />
+
+            {avatarFile && (
+              <button
+                className="registro-avatar-cambiar"
+                type="button"
+                onClick={handleOpenAvatarPicker}
+                disabled={avatarCargando}
+              >
+                Cambiar imagen
+              </button>
+            )}
+
+            {avatarError && <div className="login-error" role="alert">{avatarError}</div>}
+
+            <div className="registro-avatar-modal-actions">
+              <button
+                className="registro-avatar-omitir"
+                type="button"
+                onClick={finishRegistration}
+                disabled={avatarCargando}
+              >
+                Omitir
+              </button>
+              <button
+                className="registro-avatar-continuar"
+                type="button"
+                onClick={avatarFile ? handleAvatarContinue : handleOpenAvatarPicker}
+                disabled={avatarCargando}
+              >
+                {avatarCargando
+                  ? 'Guardando...'
+                  : avatarFile
+                    ? 'Continuar'
+                    : 'Escoger imagen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="toast-bienvenida">
+          ¡Bienvenido a EcoBazar, {nombre}!
+        </div>
+      )}
     </div>
   )
 }

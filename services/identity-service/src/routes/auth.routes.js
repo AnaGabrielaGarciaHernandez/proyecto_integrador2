@@ -68,7 +68,7 @@ function createAuthRouter({
              (email, full_name, password_hash, auth_provider, phone, avatar_url, email_verified_at)
            VALUES ($1, $2, $3, 'email', $4, $5, now())
            RETURNING ${userColumns}`,
-          [input.email, input.full_name, passwordHash, input.phone || null, input.avatar_url || null],
+          [input.email, input.full_name, passwordHash, input.phone || null, null],
         );
         const user = result.rows[0];
         const session = await createSession(client, user, tokenOptions);

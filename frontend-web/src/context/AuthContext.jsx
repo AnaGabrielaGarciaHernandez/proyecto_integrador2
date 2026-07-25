@@ -65,9 +65,9 @@ export function AuthProvider({ children }) {
     return data.user
   }, [commitSessionUser, invalidatePendingPreferences])
 
-  const register = useCallback(async ({ full_name, email, password, phone, avatar_url }) => {
+  const register = useCallback(async ({ full_name, email, password, phone }) => {
     invalidatePendingPreferences()
-    const data = await post('/auth/register', { full_name, email, password, phone, avatar_url })
+    const data = await post('/auth/register', { full_name, email, password, phone })
     commitSessionUser(data.user)
     window.dispatchEvent(new Event('authActualizado'))
     return data.user

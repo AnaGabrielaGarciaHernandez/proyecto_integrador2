@@ -32,6 +32,12 @@ test('rejects malformed registration and login payloads', () => {
     password: 'password-seguro',
     avatar_url: 'data:image/jpeg;base64,not-stored',
   }).success, false);
+  assert.equal(registerSchema.safeParse({
+    email: 'person@example.com',
+    full_name: 'Persona EcoBazar',
+    password: 'password-seguro',
+    avatar_url: 'https://example.com/avatar.jpg',
+  }).success, false);
 });
 
 test('profile updates accept only the display name and reject client avatar URLs', () => {

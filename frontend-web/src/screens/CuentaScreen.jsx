@@ -294,7 +294,11 @@ export default function CuentaScreen() {
               </button>
 
               {usuario.role === 'vendedor' && (
-                <button className="cuenta-opcion">
+                <button
+                  type="button"
+                  className="cuenta-opcion"
+                  onClick={() => navigate('/panel-vendedor')}
+                >
                   <div className="cuenta-opcion-icono" style={{ background: '#dcfce7' }}>
                     <Tag size={20} color="#16a34a" />
                   </div>

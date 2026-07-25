@@ -162,10 +162,15 @@ export default function CuentaScreen() {
               <label htmlFor="avatar_file">Foto de perfil</label>
               <input
                 id="avatar_file"
+                className="cuenta-file-input"
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 onChange={handleArchivoSeleccionado}
               />
+              <label className="cuenta-file-trigger" htmlFor="avatar_file">
+                <Pencil size={16} aria-hidden="true" />
+                Cambiar foto de perfil
+              </label>
             </div>
 
             {nuevaFotoUrl && (

@@ -34,6 +34,8 @@ const PUBLIC_ERROR_MESSAGES = {
   PRIVACY_DELETION_UNAVAILABLE: 'La eliminación no está disponible por el momento.',
   PRIVACY_SERVICE_UNAVAILABLE: 'No pudimos consultar todos tus datos por el momento.',
   USER_DELETION_PENDING: 'Esta cuenta tiene una eliminación pendiente y no puede modificarse.',
+  SELLER_APPLICATION_PENDING: 'Ya tienes una solicitud de vendedor en revisión.',
+  SELLER_APPLICATION_ALREADY_REVIEWED: 'Esta cuenta ya tiene una solicitud aprobada o suspendida.',
 }
 
 async function request(path, options = {}) {

@@ -177,6 +177,8 @@ Las llamadas REST entre servicios requieren `x-internal-token` y usan comparaci�
 | `GET /api/orders/:id` | Order | Comprador propietario | Detalle de compra |
 | `GET /api/seller/orders` | Order | Vendedor/admin | Lista de ventas propias |
 | `GET /api/seller/orders/:id` | Order | Vendedor/admin propietario | Detalle limitado a sus items |
+| `GET /api/seller-applications/me` | Catalog | Cliente | Consulta el estado de la solicitud de tienda |
+| `POST /api/seller-applications` | Catalog | Cliente | Envía una solicitud para vender como tienda o negocio |
 | `POST /api/stripe/webhook` | Payment | Firma Stripe | Fuente de verdad del pago |
 | `/api/reviews/*` | Moderation | Usuario | Reservado; actualmente `501` |
 | `/api/admin/*` | Moderation | Admin | Panel de administración (usuarios, solicitudes, reportes) |

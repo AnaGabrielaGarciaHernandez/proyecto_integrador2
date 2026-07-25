@@ -355,9 +355,11 @@ export default function AdminScreen() {
                   return (
                     <div key={application.id} className="admin-card">
                       <div style={{ padding: '16px' }}>
-                        <h3>{application.requested_display_name} <span className="admin-user-role">({application.seller_type})</span></h3>
+                        <h3>{application.requested_display_name} <span className="admin-user-role">({formatSellerType(application.seller_type)})</span></h3>
                         <p><strong>Descripción:</strong> {application.description}</p>
                         <p><strong>Teléfono:</strong> {application.contact_phone}</p>
+                        <p><strong>Correo:</strong> {application.contact_email || '—'}</p>
+                        <p><strong>Dirección:</strong> {application.contact_address || '—'}</p>
                         <div className="admin-acciones-grid" style={{ marginTop: '16px' }}>
                           <button className="admin-btn admin-btn-aprobar" onClick={() => handleApproveApp(application.id)} disabled={actionPending}>
                             <CheckCircle size={15} /> Aprobar
@@ -572,6 +574,10 @@ function shortId(value) {
 function formatSellerNames(sellers) {
   if (!sellers?.length) return 'No disponible'
   return sellers.map((seller) => seller.name || shortId(seller.user_id)).join(', ')
+}
+
+function formatSellerType(type) {
+  return { store: 'Tienda o negocio', person: 'Persona física', bazar: 'Bazar' }[type] || type || 'Sin tipo'
 }
 
 function getPaymentStatus(paymentStatus) {

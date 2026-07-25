@@ -98,12 +98,120 @@
   border-radius: 8px;
 }
 
+.vender-error {
+  margin-top: 12px;
+  padding: 12px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+}
+
+.vender-status-loading {
+  padding: 24px 0;
+  color: var(--color-text-muted);
+}
+
+.vender-pitch {
+  max-width: 760px;
+  padding: 28px;
+  border: 1px solid #d8efe0;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #f1fbf4 0%, #fffdf8 100%);
+}
+
+.vender-pitch-eyebrow {
+  margin-bottom: 8px;
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vender-pitch h3 {
+  max-width: 650px;
+  margin-bottom: 14px;
+  color: var(--color-text);
+  font-size: clamp(24px, 4vw, 36px);
+  line-height: 1.12;
+}
+
+.vender-pitch > p:not(.vender-pitch-eyebrow) {
+  max-width: 680px;
+  color: var(--color-text-muted);
+  line-height: 1.65;
+}
+
+.vender-pitch ul {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vender-pitch li {
+  position: relative;
+  padding-left: 28px;
+  color: var(--color-text);
+  line-height: 1.45;
+}
+
+.vender-pitch li::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--color-accent);
+  content: '✓';
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.vender-application-status {
+  max-width: 760px;
+  margin-bottom: 20px;
+  padding: 20px;
+  border-radius: 14px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+}
+
+.vender-application-status.pending {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.vender-application-status.rejected {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.vender-application-status h3 {
+  margin-bottom: 6px;
+}
+
+.vender-application-status p {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.vender-application-status small {
+  opacity: 0.85;
+}
+
 @media (max-width: 768px) {
   .vender-hero {
     padding: 64px 20px 24px;
   }
   .vender-body {
     padding: 20px 16px 32px;
+  }
+  .vender-pitch {
+    padding: 22px 18px;
   }
 }
 

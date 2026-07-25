@@ -14,6 +14,10 @@ const ResolveVariantsSchema = z.object({
   buyer_id: z.string().uuid().optional(),
 });
 const UserIdSchema = z.string().uuid();
+const SellerApplicationReviewSchema = z.object({
+  status: z.enum(['approved', 'rejected']),
+  rejection_reason: z.string().trim().max(2000).optional(),
+});
 
 function createInternalRouter({ db, internalToken }) {
   const router = express.Router();
@@ -60,7 +64,8 @@ function createInternalRouter({ db, internalToken }) {
   router.get('/seller-applications', async (req, res, next) => {
     try {
       const result = await db.query(
-        `SELECT id, user_id, requested_display_name, seller_type, description, contact_phone, status, created_at
+        `SELECT id, user_id, requested_display_name, seller_type, description,
+                contact_phone, contact_email, contact_address, status, created_at
          FROM catalog.seller_applications
          WHERE status = 'pending'
          ORDER BY created_at ASC`
@@ -73,8 +78,8 @@ function createInternalRouter({ db, internalToken }) {
 
   router.patch('/seller-applications/:id/status', async (req, res, next) => {
     try {
-      const { id } = req.params;
-      const { status, rejection_reason } = req.body;
+      const id = parse(z.string().uuid(), req.params.id);
+      const { status, rejection_reason } = parse(SellerApplicationReviewSchema, req.body);
       
       const result = await db.transaction(async (client) => {
         const appRes = await client.query(
@@ -90,10 +95,21 @@ function createInternalRouter({ db, internalToken }) {
         
         if (status === 'approved') {
           await client.query(
-            `INSERT INTO catalog.seller_profiles (user_id, seller_type, display_name, description, status, phone, verified_at)
-             VALUES ($1, $2, $3, $4, 'approved', $5, now())
-             ON CONFLICT (user_id) DO NOTHING`,
-            [application.user_id, application.seller_type, application.requested_display_name, application.description, application.contact_phone]
+            `INSERT INTO catalog.seller_profiles
+               (user_id, seller_type, display_name, description, status,
+                phone, address_line, verified_at)
+             VALUES ($1, $2, $3, $4, 'approved', $5, $6, now())
+             ON CONFLICT (user_id) DO UPDATE
+             SET seller_type = EXCLUDED.seller_type,
+                 display_name = EXCLUDED.display_name,
+                 description = EXCLUDED.description,
+                 status = 'approved',
+                 phone = EXCLUDED.phone,
+                 address_line = EXCLUDED.address_line,
+                 verified_at = now(),
+                 updated_at = now()`,
+            [application.user_id, application.seller_type, application.requested_display_name,
+              application.description, application.contact_phone, application.contact_address]
           );
         }
         return application;
@@ -125,7 +141,8 @@ function createInternalRouter({ db, internalToken }) {
       );
       const applications = await db.query(
         `SELECT id, user_id, requested_display_name, seller_type, description,
-                contact_phone, status, rejection_reason, created_at, updated_at
+                contact_phone, contact_email, contact_address,
+                status, rejection_reason, created_at, updated_at
          FROM catalog.seller_applications
          WHERE user_id = $1
          ORDER BY created_at`,
@@ -244,7 +261,8 @@ function createInternalRouter({ db, internalToken }) {
         await client.query(
           `UPDATE catalog.seller_applications
            SET requested_display_name = 'Vendedor eliminado', description = NULL,
-               contact_phone = NULL, rejection_reason = NULL, reviewed_by = NULL,
+               contact_phone = NULL, contact_email = NULL, contact_address = NULL,
+               rejection_reason = NULL, reviewed_by = NULL,
                updated_at = now()
            WHERE user_id = $1`,
           [userId],

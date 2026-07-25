@@ -10,6 +10,7 @@ const {
 const { createProductsRouter } = require('./routes/products');
 const { createInternalRouter } = require('./routes/internal');
 const { createSellerRouter } = require('./routes/seller');
+const { createSellerApplicationsRouter } = require('./routes/seller-applications');
 const { createWishlistRouter } = require('./routes/wishlist');
 
 function createApp({ db, config }) {
@@ -42,6 +43,7 @@ function createApp({ db, config }) {
 
   app.use('/api/products', createProductsRouter(db));
   app.use('/api/wishlist', createWishlistRouter(db, { mutationRateLimit }));
+  app.use('/api/seller-applications', createSellerApplicationsRouter(db, { mutationRateLimit }));
   app.use('/api/seller', createSellerRouter());
   app.use('/internal', createInternalRouter({ db, internalToken: config.INTERNAL_SERVICE_TOKEN }));
   app.use(notFound);

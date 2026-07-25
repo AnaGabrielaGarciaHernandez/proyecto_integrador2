@@ -267,6 +267,16 @@ Estas rutas no se publican al host y requieren el token de servicio:
 | Payment | `POST /internal/checkout-sessions` | Crear o recuperar Checkout idempotentemente |
 | Payment | `POST /internal/checkout-sessions/:orderId/expire` | Expirar Checkout antes de compensar |
 
+Las rutas administrativas de usuarios y ventas aceptan `search`, `limit` y
+`offset` (por defecto `25`, con máximo `100`). Usuarios busca por nombre o
+correo y excluye cuentas con `deleted_at`; los usuarios con eliminación
+pendiente se conservan visibles, pero sin acciones administrativas.
+El reporte de ventas busca por número o UUID del pedido, comprador y vendedor,
+devuelve todos los estados en `movements` y conserva `total_sales_cents` como
+el dinero efectivamente cobrado (`payment_status = 'succeeded'` y estados
+operativos cobrados). También incluye `paid_orders_count`,
+`cancelled_orders_count` y un objeto `pagination`.
+
 ## Checkout Y Saga
 
 Order es el orquestador. El total se calcula desde los snapshots autoritativos del carrito; el frontend no envía precios, total, comprador ni estados.

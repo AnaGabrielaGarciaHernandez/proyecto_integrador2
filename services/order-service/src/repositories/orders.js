@@ -6,6 +6,7 @@ const ITEM_JSON = `jsonb_build_object(
   'product_id', oi.product_id,
   'seller_id', oi.seller_id,
   'seller_user_id', oi.seller_user_id,
+  'seller_name', oi.seller_name,
   'product_name', oi.product_name,
   'size_name', oi.size_name,
   'image_url', oi.cover_image,
@@ -108,9 +109,11 @@ function createOrdersRepository(db) {
         await client.query(
           `UPDATE order_items
            SET seller_user_id = COALESCE($3, seller_user_id),
-               product_id = COALESCE($4, product_id)
+               product_id = COALESCE($4, product_id),
+               seller_name = COALESCE($5, seller_name)
            WHERE order_id = $1 AND variant_id = $2`,
-          [orderId, item.variant_id, item.seller_user_id || null, item.product_id || null],
+          [orderId, item.variant_id, item.seller_user_id || null, item.product_id || null,
+            item.seller_name || null],
         );
       }
       console.log(`[order-service] correlation_id=${correlationId} event_type=checkout.requested step=inventory_reserved order_id=${orderId}`);

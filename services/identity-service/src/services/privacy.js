@@ -59,8 +59,27 @@ function createPrivacyCoordinator({
     };
   }
 
-  async function requestDeletion(userId, correlationId) {
+  async function requestDeletion(userId, correlationId, { rejectIfPending = false } = {}) {
     return db.transaction(async (client) => {
+      const userResult = await client.query(
+        `SELECT id, is_active, deletion_requested_at, deleted_at
+         FROM identity.users
+         WHERE id = $1
+         FOR UPDATE`,
+        [userId],
+      );
+      const user = userResult.rows[0];
+      if (!user) {
+        throw createHttpError(
+          rejectIfPending ? 'User not found' : 'Invalid session',
+          rejectIfPending ? 404 : 401,
+          rejectIfPending ? { code: 'USER_NOT_FOUND' } : undefined,
+        );
+      }
+      if (user.deleted_at) {
+        throw createHttpError('User not found', 404, { code: 'USER_NOT_FOUND' });
+      }
+
       const existing = await client.query(
         `SELECT id, status, created_at
          FROM identity.privacy_requests
@@ -71,16 +90,23 @@ function createPrivacyCoordinator({
          LIMIT 1`,
         [userId],
       );
-      if (existing.rows[0]) return existing.rows[0];
-
-      const userResult = await client.query(
-        `SELECT id, is_active
-         FROM identity.users
-         WHERE id = $1
-         FOR UPDATE`,
-        [userId],
-      );
-      if (!userResult.rows[0]) throw createHttpError('Invalid session', 401);
+      if (existing.rows[0]) {
+        if (rejectIfPending) {
+          throw createHttpError(
+            'User deletion is already pending',
+            409,
+            { code: 'USER_DELETION_PENDING' },
+          );
+        }
+        return existing.rows[0];
+      }
+      if (user.deletion_requested_at) {
+        throw createHttpError(
+          'User deletion is already pending',
+          409,
+          { code: 'USER_DELETION_PENDING' },
+        );
+      }
 
       const request = await client.query(
         `INSERT INTO identity.privacy_requests

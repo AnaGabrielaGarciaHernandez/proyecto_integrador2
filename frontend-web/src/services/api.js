@@ -33,6 +33,7 @@ const PUBLIC_ERROR_MESSAGES = {
   PRIVACY_EXPORT_UNAVAILABLE: 'La exportación no está disponible por el momento.',
   PRIVACY_DELETION_UNAVAILABLE: 'La eliminación no está disponible por el momento.',
   PRIVACY_SERVICE_UNAVAILABLE: 'No pudimos consultar todos tus datos por el momento.',
+  USER_DELETION_PENDING: 'Esta cuenta tiene una eliminación pendiente y no puede modificarse.',
 }
 
 async function request(path, options = {}) {

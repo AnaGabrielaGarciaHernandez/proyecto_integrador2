@@ -61,3 +61,34 @@ test('compensation uses compensating first and only workers retry durable pendin
   assert.match(statements[0].sql, /status = 'compensating'/);
   assert.match(statements[1].sql, /IN \('compensating', 'compensation_pending'\)/);
 });
+
+test('inventory reservation stores the historical seller name on order items', async () => {
+  const statements = [];
+  const db = {
+    async transaction(work) {
+      return work({
+        async query(sql, params = []) {
+          statements.push({ sql, params });
+          return { rows: [] };
+        },
+      });
+    },
+  };
+  const repository = createOrdersRepository(db);
+
+  await repository.markInventoryReserved(
+    'order-1',
+    'correlation-1',
+    {
+      items: [{
+        variant_id: 'variant-1',
+        product_id: 'product-1',
+        seller_user_id: 'seller-user-1',
+        seller_name: 'Tienda Verde',
+      }],
+    },
+  );
+
+  assert.match(statements[1].sql, /seller_name = COALESCE\(\$5, seller_name\)/);
+  assert.equal(statements[1].params[4], 'Tienda Verde');
+});

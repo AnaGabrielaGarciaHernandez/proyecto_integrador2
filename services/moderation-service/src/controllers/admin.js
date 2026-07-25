@@ -25,7 +25,17 @@ async function fetchInternal(url, options = {}) {
   
   if (!response.ok) {
     const text = await response.text();
-    throw createHttpError(`Internal fetch failed: ${text}`, response.status);
+    let payload;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = null;
+    }
+    throw createHttpError(
+      payload?.error?.message || 'Internal fetch failed',
+      response.status,
+      payload?.error?.details,
+    );
   }
   
   if (response.status === 204) return null;
@@ -34,7 +44,12 @@ async function fetchInternal(url, options = {}) {
 
 async function getUsers(req, res, next) {
   try {
-    const data = await fetchInternal(`${IDENTITY_URL}/internal/users`);
+    const query = new URLSearchParams({
+      search: typeof req.query.search === 'string' ? req.query.search : '',
+      limit: typeof req.query.limit === 'string' ? req.query.limit : '25',
+      offset: typeof req.query.offset === 'string' ? req.query.offset : '0',
+    });
+    const data = await fetchInternal(`${IDENTITY_URL}/internal/users?${query.toString()}`);
     res.json(data);
   } catch (err) { next(err); }
 }
@@ -116,7 +131,12 @@ async function rejectApplication(req, res, next) {
 
 async function getSalesReports(req, res, next) {
   try {
-    const data = await fetchInternal(`${ORDER_URL}/internal/reports/sales`);
+    const query = new URLSearchParams({
+      search: typeof req.query.search === 'string' ? req.query.search : '',
+      limit: typeof req.query.limit === 'string' ? req.query.limit : '25',
+      offset: typeof req.query.offset === 'string' ? req.query.offset : '0',
+    });
+    const data = await fetchInternal(`${ORDER_URL}/internal/reports/sales?${query.toString()}`);
     res.json(data);
   } catch (err) { next(err); }
 }

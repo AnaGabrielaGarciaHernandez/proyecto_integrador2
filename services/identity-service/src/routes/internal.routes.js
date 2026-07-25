@@ -8,6 +8,27 @@ const paramsSchema = z.object({ id: z.string().uuid() });
 const roleSchema = z.object({
   role: z.enum(['cliente', 'vendedor', 'admin']),
 });
+const suspendSchema = z.object({
+  is_active: z.boolean(),
+});
+const usersQuerySchema = z.object({
+  search: z.string().trim().max(120).default(''),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+function assertAdminUserActionAllowed(user) {
+  if (user.deleted_at) {
+    throw createHttpError('User not found', 404, { code: 'USER_NOT_FOUND' });
+  }
+  if (user.deletion_requested_at) {
+    throw createHttpError(
+      'User deletion is already pending',
+      409,
+      { code: 'USER_DELETION_PENDING' },
+    );
+  }
+}
 
 function createInternalRouter({ db, requireInternalToken, privacyCoordinator = null }) {
   const router = express.Router();
@@ -59,14 +80,16 @@ function createInternalRouter({ db, requireInternalToken, privacyCoordinator = n
       const result = await db.transaction(async (client) => {
         const existing = await client.query(
           `SELECT id, email, full_name, auth_provider, role, phone, bio,
-                  avatar_url, is_active, created_at, show_home_sell_banner
+                  avatar_url, is_active, created_at, show_home_sell_banner,
+                  deletion_requested_at, deleted_at
            FROM identity.users
-           WHERE id = $1 AND is_active = true
+           WHERE id = $1
            FOR UPDATE`,
           [params.data.id],
         );
         const previous = existing.rows[0];
         if (!previous) throw createHttpError('User not found', 404);
+        assertAdminUserActionAllowed(previous);
         if (previous.role === input.data.role) return previous;
 
         const updated = await client.query(
@@ -74,7 +97,8 @@ function createInternalRouter({ db, requireInternalToken, privacyCoordinator = n
            SET role = $2
            WHERE id = $1
            RETURNING id, email, full_name, auth_provider, role, phone, bio,
-                     avatar_url, is_active, created_at, show_home_sell_banner`,
+                     avatar_url, is_active, created_at, show_home_sell_banner,
+                     deletion_requested_at, deleted_at`,
           [params.data.id, input.data.role],
         );
         await client.query(
@@ -111,12 +135,42 @@ function createInternalRouter({ db, requireInternalToken, privacyCoordinator = n
 
   router.get('/users', async (req, res, next) => {
     try {
+      const input = usersQuerySchema.safeParse(req.query);
+      if (!input.success) {
+        throw createHttpError('Invalid request', 400, {
+          query: input.error.flatten(),
+        });
+      }
+
+      const { search, limit, offset } = input.data;
+      const searchPattern = `%${search}%`;
       const result = await db.query(
-        `SELECT id, email, full_name, auth_provider, role, phone, is_active, created_at
+        `SELECT id, email, full_name, auth_provider, role, phone, is_active, created_at,
+                deletion_requested_at
          FROM identity.users
-         ORDER BY created_at DESC`
+         WHERE deleted_at IS NULL
+           AND ($1 = '' OR lower(full_name) LIKE lower($2) OR lower(email) LIKE lower($2))
+         ORDER BY created_at DESC
+         LIMIT $3 OFFSET $4`,
+        [search, searchPattern, limit, offset],
       );
-      res.json({ users: result.rows });
+      const totalResult = await db.query(
+        `SELECT count(*)::integer AS total
+         FROM identity.users
+         WHERE deleted_at IS NULL
+           AND ($1 = '' OR lower(full_name) LIKE lower($2) OR lower(email) LIKE lower($2))`,
+        [search, searchPattern],
+      );
+      const total = Number(totalResult.rows[0]?.total || 0);
+      res.json({
+        users: result.rows,
+        total,
+        pagination: {
+          limit,
+          offset,
+          has_more: offset + result.rows.length < total,
+        },
+      });
     } catch (error) {
       next(error);
     }
@@ -124,14 +178,38 @@ function createInternalRouter({ db, requireInternalToken, privacyCoordinator = n
 
   router.patch('/users/:id/suspend', async (req, res, next) => {
     try {
-      const { id } = req.params;
-      const { is_active } = req.body;
-      const result = await db.query(
-        `UPDATE identity.users SET is_active = $1 WHERE id = $2 RETURNING id`,
-        [is_active, id]
-      );
-      if (result.rowCount === 0) throw createHttpError('User not found', 404);
-      res.json({ ok: true });
+      const params = paramsSchema.safeParse(req.params);
+      const input = suspendSchema.safeParse(req.body);
+      if (!params.success || !input.success) {
+        throw createHttpError('Invalid request', 400, {
+          params: params.success ? undefined : params.error.flatten(),
+          body: input.success ? undefined : input.error.flatten(),
+        });
+      }
+
+      const result = await db.transaction(async (client) => {
+        const existing = await client.query(
+          `SELECT id, deleted_at, deletion_requested_at
+           FROM identity.users
+           WHERE id = $1
+           FOR UPDATE`,
+          [params.data.id],
+        );
+        const user = existing.rows[0];
+        if (!user) throw createHttpError('User not found', 404);
+        assertAdminUserActionAllowed(user);
+
+        const updated = await client.query(
+          `UPDATE identity.users
+           SET is_active = $1
+           WHERE id = $2 AND deleted_at IS NULL AND deletion_requested_at IS NULL
+           RETURNING id, is_active`,
+          [input.data.is_active, params.data.id],
+        );
+        if (!updated.rows[0]) throw createHttpError('User not found', 404);
+        return updated.rows[0];
+      });
+      res.json({ ok: true, user: result });
     } catch (error) {
       next(error);
     }
@@ -149,6 +227,7 @@ function createInternalRouter({ db, requireInternalToken, privacyCoordinator = n
       const request = await privacyCoordinator.requestDeletion(
         params.data.id,
         req.correlationId,
+        { rejectIfPending: true },
       );
       res.status(202).json({ ok: true, request_id: request.id, status: request.status });
     } catch (error) {

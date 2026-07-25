@@ -14,8 +14,9 @@ const PaginationSchema = z.object({
 });
 const UuidSchema = z.string().uuid();
 
-function createWishlistRouter(db) {
+function createWishlistRouter(db, { mutationRateLimit } = {}) {
   const router = express.Router();
+  const mutationGuard = mutationRateLimit || ((req, res, next) => next());
   router.use(requireWishlistUser);
 
   router.get('/', async (req, res, next) => {
@@ -32,7 +33,7 @@ function createWishlistRouter(db) {
     }
   });
 
-  router.put('/:productId', async (req, res, next) => {
+  router.put('/:productId', mutationGuard, async (req, res, next) => {
     try {
       const productId = parseProductId(req.params.productId);
       res.json(await addWishlistItem(db, req.user.id, productId));
@@ -41,7 +42,7 @@ function createWishlistRouter(db) {
     }
   });
 
-  router.delete('/:productId', async (req, res, next) => {
+  router.delete('/:productId', mutationGuard, async (req, res, next) => {
     try {
       const productId = parseProductId(req.params.productId);
       await removeWishlistItem(db, req.user.id, productId);

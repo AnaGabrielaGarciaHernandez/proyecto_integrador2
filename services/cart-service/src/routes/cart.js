@@ -18,8 +18,9 @@ const UpdateItemSchema = z.object({
 });
 const UuidSchema = z.string().uuid();
 
-function createCartRouter({ db, catalogClient }) {
+function createCartRouter({ db, catalogClient, mutationRateLimit }) {
   const router = express.Router();
+  const mutationGuard = mutationRateLimit || ((req, res, next) => next());
   router.use(requireGatewayUser);
 
   router.get('/', async (req, res, next) => {
@@ -30,7 +31,7 @@ function createCartRouter({ db, catalogClient }) {
     }
   });
 
-  router.post('/reconcile', async (req, res, next) => {
+  router.post('/reconcile', mutationGuard, async (req, res, next) => {
     try {
       res.json(await reconcileCart(db, catalogClient, req.user.id, req.correlationId));
     } catch (error) {
@@ -38,7 +39,7 @@ function createCartRouter({ db, catalogClient }) {
     }
   });
 
-  router.post('/items', async (req, res, next) => {
+  router.post('/items', mutationGuard, async (req, res, next) => {
     try {
       const input = parse(AddItemSchema, req.body, 'Invalid request body');
       const cart = await addItem(db, catalogClient, req.user.id, input, req.correlationId);
@@ -48,7 +49,7 @@ function createCartRouter({ db, catalogClient }) {
     }
   });
 
-  router.patch('/items/:id', async (req, res, next) => {
+  router.patch('/items/:id', mutationGuard, async (req, res, next) => {
     try {
       const itemId = parse(UuidSchema, req.params.id, 'Invalid cart item id');
       const input = parse(UpdateItemSchema, req.body, 'Invalid request body');
@@ -66,7 +67,7 @@ function createCartRouter({ db, catalogClient }) {
     }
   });
 
-  router.delete('/items/:id', async (req, res, next) => {
+  router.delete('/items/:id', mutationGuard, async (req, res, next) => {
     try {
       const itemId = parse(UuidSchema, req.params.id, 'Invalid cart item id');
       res.json({ cart: await deleteItem(db, req.user.id, itemId) });

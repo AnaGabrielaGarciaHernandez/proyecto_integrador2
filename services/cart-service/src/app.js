@@ -2,6 +2,8 @@ const express = require('express');
 const {
   correlationMiddleware,
   requestLogger,
+  createPostgresRateLimiter,
+  createRateLimitMiddleware,
   notFound,
   errorHandler,
 } = require('@ecobazar/platform');
@@ -21,6 +23,17 @@ function createApp({ db, config, catalogClient }) {
   app.use(correlationMiddleware('cart-service'));
   app.use(requestLogger('cart-service'));
   app.use(express.json({ limit: '1mb' }));
+  const mutationLimiter = createPostgresRateLimiter({
+    db,
+    scope: 'cart:mutation',
+    maxAttempts: config.RATE_LIMIT_MUTATION_MAX,
+    windowMs: config.RATE_LIMIT_MUTATION_WINDOW_MS,
+    hashSecret: config.RATE_LIMIT_HASH_KEY,
+  });
+  const mutationRateLimit = createRateLimitMiddleware({
+    limiter: mutationLimiter,
+    keyResolver: (req) => `${req.get('x-user-id') || 'anonymous'}:${req.path}`,
+  });
 
   app.get('/health/live', (req, res) => res.json({ ok: true, service: 'cart-service' }));
   app.get('/health/ready', async (req, res, next) => {
@@ -32,7 +45,7 @@ function createApp({ db, config, catalogClient }) {
     }
   });
 
-  app.use('/api/cart', createCartRouter({ db, catalogClient: client }));
+  app.use('/api/cart', createCartRouter({ db, catalogClient: client, mutationRateLimit }));
   app.use('/internal', createInternalRouter({ db, internalToken: config.INTERNAL_SERVICE_TOKEN }));
   app.use(notFound);
   app.use(errorHandler);

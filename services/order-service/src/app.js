@@ -2,6 +2,8 @@ const express = require('express');
 const {
   correlationMiddleware,
   requestLogger,
+  createPostgresRateLimiter,
+  createRateLimitMiddleware,
   notFound,
   errorHandler,
 } = require('@ecobazar/platform');
@@ -14,6 +16,17 @@ function createApp({ db, orders, checkoutService }) {
   app.use(correlationMiddleware('order-service'));
   app.use(requestLogger('order-service'));
   app.use(express.json({ limit: '1mb' }));
+  const mutationLimiter = createPostgresRateLimiter({
+    db,
+    scope: 'order:mutation',
+    maxAttempts: env.RATE_LIMIT_MUTATION_MAX,
+    windowMs: env.RATE_LIMIT_MUTATION_WINDOW_MS,
+    hashSecret: env.RATE_LIMIT_HASH_KEY,
+  });
+  const mutationRateLimit = createRateLimitMiddleware({
+    limiter: mutationLimiter,
+    keyResolver: (req) => `${req.get('x-user-id') || 'anonymous'}:${req.path}`,
+  });
 
   app.get('/health/live', (req, res) => res.json({ ok: true, service: 'order-service' }));
   app.get('/health/ready', async (req, res, next) => {
@@ -30,7 +43,7 @@ function createApp({ db, orders, checkoutService }) {
     }
   });
 
-  app.post('/api/checkout', requireUser, async (req, res, next) => {
+  app.post('/api/checkout', requireUser, mutationRateLimit, async (req, res, next) => {
     try {
       const checkout = await checkoutService.createCheckout(req.user, req.correlationId);
       res.status(201).json({ checkout });
@@ -39,7 +52,7 @@ function createApp({ db, orders, checkoutService }) {
     }
   });
 
-  app.post('/api/checkout/active/cancel', requireUser, async (req, res, next) => {
+  app.post('/api/checkout/active/cancel', requireUser, mutationRateLimit, async (req, res, next) => {
     try {
       const order = await checkoutService.cancelActiveCheckout(
         req.user.id,
@@ -51,7 +64,7 @@ function createApp({ db, orders, checkoutService }) {
     }
   });
 
-  app.post('/api/checkout/:orderId/cancel', requireUser, async (req, res, next) => {
+  app.post('/api/checkout/:orderId/cancel', requireUser, mutationRateLimit, async (req, res, next) => {
     try {
       const orderId = ensureUuid(req.params.orderId);
       const order = await checkoutService.cancelCheckout(orderId, req.user.id, req.correlationId);

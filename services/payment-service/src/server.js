@@ -1,4 +1,4 @@
-const { createRabbitBus, startOutboxWorker } = require('@ecobazar/platform');
+const { createRabbitBus, startOutboxWorker, safeLog } = require('@ecobazar/platform');
 const env = require('./config/env');
 const db = require('./config/db');
 const { getStripe } = require('./config/stripe');
@@ -26,7 +26,11 @@ async function main() {
     db, bus, serviceName: 'payment-service', intervalMs: env.OUTBOX_INTERVAL_MS,
   });
   const app = createApp({
-    db, serviceToken: env.INTERNAL_SERVICE_TOKEN, checkoutService, webhookService,
+    db,
+    serviceToken: env.INTERNAL_SERVICE_TOKEN,
+    checkoutService,
+    webhookService,
+    config: env,
   });
   const server = app.listen(env.PORT, () => {
     console.log(`[payment-service] port=${env.PORT} step=listening`);
@@ -47,6 +51,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('[payment-service] step=startup_failed', error);
+  safeLog('error', 'payment-service', { step: 'startup_failed' }, error);
   process.exitCode = 1;
 });

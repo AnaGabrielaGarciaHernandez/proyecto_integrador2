@@ -1,11 +1,15 @@
 const { randomUUID, timingSafeEqual } = require('node:crypto');
 
 const PUBLIC_SERVER_ERROR_CODES = new Set([
+  'AVATAR_STORAGE_UNAVAILABLE',
   'CATALOG_UNAVAILABLE',
   'CHECKOUT_IN_PROGRESS',
   'DEPENDENCY_INVALID_RESPONSE',
   'DEPENDENCY_UNAVAILABLE',
   'INTERNAL_ERROR',
+  'PRIVACY_DELETION_UNAVAILABLE',
+  'PRIVACY_EXPORT_UNAVAILABLE',
+  'PRIVACY_SERVICE_UNAVAILABLE',
   'SERVICE_UNAVAILABLE',
   'STRIPE_UNAVAILABLE',
 ]);
@@ -30,9 +34,21 @@ function correlationMiddleware(serviceName) {
 function requestLogger(serviceName) {
   return (req, res, next) => {
     const started = Date.now();
-    console.log(`[${serviceName}] correlation_id=${req.correlationId} method=${req.method} path=${req.originalUrl} step=request_started`);
+    safeLog('info', serviceName, {
+      correlation_id: req.correlationId,
+      method: req.method,
+      path: req.path || '/',
+      step: 'request_started',
+    });
     res.on('finish', () => {
-      console.log(`[${serviceName}] correlation_id=${req.correlationId} method=${req.method} path=${req.originalUrl} status=${res.statusCode} duration_ms=${Date.now() - started} step=request_finished`);
+      safeLog('info', serviceName, {
+        correlation_id: req.correlationId,
+        method: req.method,
+        path: req.path || '/',
+        status: res.statusCode,
+        duration_ms: Date.now() - started,
+        step: 'request_finished',
+      });
     });
     next();
   };
@@ -49,14 +65,19 @@ function requireInternalToken(expectedToken) {
 }
 
 function notFound(req, res, next) {
-  next(createHttpError(`Route not found: ${req.method} ${req.originalUrl}`, 404));
+  next(createHttpError(`Route not found: ${req.method} ${req.path || '/'}`, 404));
 }
 
 function errorHandler(error, req, res, next) {
   void next;
   const status = error.status || error.statusCode || 500;
   if (status >= 500) {
-    console.error(`[${req.serviceName || 'service'}] correlation_id=${req.correlationId || 'unknown'} step=request_failed`, error);
+    safeLog('error', req.serviceName || 'service', {
+      correlation_id: req.correlationId || 'unknown',
+      method: req.method,
+      path: req.path || '/',
+      step: 'request_failed',
+    }, error);
     const code = isPublicErrorCode(error.details?.code)
       ? error.details.code
       : 'INTERNAL_ERROR';
@@ -84,6 +105,66 @@ function isPublicErrorCode(value) {
   return PUBLIC_SERVER_ERROR_CODES.has(value);
 }
 
+const REDACTION_PATTERNS = [
+  /\b(?:sb_(?:secret|publishable)|sk_(?:live|test))_[A-Za-z0-9_-]+\b/gi,
+  /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi,
+  /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
+  /\b(?:password|passphrase|token|secret|api[_-]?key|authorization)\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^,\s}]+)/gi,
+];
+
+function redactString(value) {
+  let result = String(value);
+  for (const pattern of REDACTION_PATTERNS) {
+    result = result.replace(pattern, (match) => {
+      if (/^[^:=]+[:=]/.test(match)) return match.replace(/([:=])(?:.*)$/, '$1[REDACTED]');
+      return '[REDACTED]';
+    });
+  }
+  return result.slice(0, 500);
+}
+
+function sanitizeLogValue(value, key = '', seen = new WeakSet()) {
+  const sensitiveKey = /(?:password|passphrase|token|secret|api[_-]?key|authorization|cookie|raw_event|body|image|buffer|content)/i;
+  if (sensitiveKey.test(key)) return '[REDACTED]';
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string') return redactString(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Buffer.isBuffer(value)) return '[REDACTED]';
+  if (typeof value !== 'object') return String(value);
+  if (seen.has(value)) return '[CIRCULAR]';
+  seen.add(value);
+  if (Array.isArray(value)) return value.slice(0, 20).map((item) => sanitizeLogValue(item, '', seen));
+  return Object.fromEntries(Object.entries(value).slice(0, 40).map(([entryKey, entryValue]) => [
+    entryKey,
+    sanitizeLogValue(entryValue, entryKey, seen),
+  ]));
+}
+
+function summarizeError(error) {
+  if (!error) return undefined;
+  const summary = {
+    name: error.name || 'Error',
+  };
+  if (error.code !== undefined) summary.code = redactString(error.code);
+  if (error.status !== undefined) summary.status = error.status;
+  if (error.statusCode !== undefined) summary.status_code = error.statusCode;
+  if (error.details?.code !== undefined) summary.details_code = redactString(error.details.code);
+  if (error.details?.dependency !== undefined) summary.dependency = redactString(error.details.dependency);
+  return summary;
+}
+
+function safeLog(level, serviceName, fields = {}, error) {
+  const payload = {
+    timestamp: new Date().toISOString(),
+    level,
+    service: serviceName || 'service',
+    ...sanitizeLogValue(fields),
+  };
+  if (error) payload.error = summarizeError(error);
+  const writer = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+  writer(JSON.stringify(payload));
+}
+
 module.exports = {
   createHttpError,
   correlationMiddleware,
@@ -91,4 +172,7 @@ module.exports = {
   requireInternalToken,
   notFound,
   errorHandler,
+  redactString,
+  safeLog,
+  summarizeError,
 };

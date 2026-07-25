@@ -4,6 +4,7 @@ const {
   createRabbitBus,
   startOutboxWorker,
   startConsumer,
+  safeLog,
 } = require('@ecobazar/platform');
 const { loadConfig } = require('./config');
 const { createApp } = require('./app');
@@ -56,13 +57,13 @@ async function main() {
 
   for (const signal of ['SIGTERM', 'SIGINT']) {
     process.once(signal, () => shutdown(signal).catch((error) => {
-      console.error('[cart-service] step=shutdown_failed', error);
+      safeLog('error', 'cart-service', { step: 'shutdown_failed' }, error);
       process.exitCode = 1;
     }));
   }
 }
 
 main().catch((error) => {
-  console.error('[cart-service] step=startup_failed', error);
+  safeLog('error', 'cart-service', { step: 'startup_failed' }, error);
   process.exitCode = 1;
 });

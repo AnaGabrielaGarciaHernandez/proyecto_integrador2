@@ -2,6 +2,7 @@ const {
   createRabbitBus,
   startConsumer,
   startOutboxWorker,
+  safeLog,
 } = require('@ecobazar/platform');
 const { EVENT_TYPES } = require('@ecobazar/contracts');
 const env = require('./config/env');
@@ -61,6 +62,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('[order-service] step=startup_failed', error);
+  safeLog('error', 'order-service', { step: 'startup_failed' }, error);
   process.exitCode = 1;
 });

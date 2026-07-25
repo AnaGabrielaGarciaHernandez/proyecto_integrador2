@@ -1,0 +1,139 @@
+.privacidad-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 28px 32px 56px;
+  color: var(--color-text);
+}
+
+.privacidad-page-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.privacidad-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-sidebar-bg);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.privacidad-version {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.privacidad-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 28px;
+  margin-bottom: 18px;
+  border-radius: 20px;
+  color: #fff;
+  background: linear-gradient(135deg, #1f5f42, var(--color-sidebar-bg));
+}
+
+.privacidad-hero-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.privacidad-kicker {
+  margin-bottom: 5px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.privacidad-hero h1 {
+  margin-bottom: 8px;
+  font-size: 30px;
+}
+
+.privacidad-hero p:last-child {
+  max-width: 620px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.privacidad-card {
+  padding: 24px;
+  margin-bottom: 14px;
+  border: 1px solid #e3ebe5;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.privacidad-card h2 {
+  margin-bottom: 10px;
+  color: var(--color-text);
+  font-size: 17px;
+}
+
+.privacidad-card p,
+.privacidad-card li {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.privacidad-card p + p {
+  margin-top: 10px;
+}
+
+.privacidad-card ul {
+  display: grid;
+  gap: 7px;
+  padding-left: 20px;
+}
+
+.privacidad-card a {
+  color: var(--color-sidebar-bg);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.privacidad-muted {
+  padding-top: 12px;
+  font-size: 12px !important;
+}
+
+@media (max-width: 600px) {
+  .privacidad-page {
+    padding: 20px 16px 40px;
+  }
+
+  .privacidad-page-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .privacidad-hero {
+    padding: 22px 18px;
+  }
+
+  .privacidad-hero h1 {
+    font-size: 25px;
+  }
+
+  .privacidad-card {
+    padding: 20px 18px;
+  }
+}

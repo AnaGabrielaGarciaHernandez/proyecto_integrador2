@@ -1,5 +1,5 @@
 const path = require('node:path');
-const { runMigrations } = require('@ecobazar/platform');
+const { runMigrations, safeLog } = require('@ecobazar/platform');
 const db = require('./config/db');
 
 async function main() {
@@ -8,6 +8,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('[order-service] step=migration_failed', error);
+  safeLog('error', 'order-service', { step: 'migration_failed' }, error);
   process.exitCode = 1;
 });

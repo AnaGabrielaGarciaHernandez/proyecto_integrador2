@@ -11,6 +11,14 @@ const preferencesMigration = fs.readFileSync(
   path.resolve(__dirname, '../migrations/002_user_preferences.sql'),
   'utf8',
 );
+const privacyMigration = fs.readFileSync(
+  path.resolve(__dirname, '../migrations/004_privacy_requests.sql'),
+  'utf8',
+);
+const rateLimitMigration = fs.readFileSync(
+  path.resolve(__dirname, '../migrations/005_rate_limits.sql'),
+  'utf8',
+);
 
 test('identity migration isolates users, sessions and the simplified outbox', () => {
   assert.match(migration, /CREATE TABLE IF NOT EXISTS identity\.users/i);
@@ -36,4 +44,14 @@ test('user preferences migration adds a non-null banner preference defaulting to
   );
   assert.doesNotMatch(preferencesMigration, /UPDATE identity\.users/i);
   assert.doesNotMatch(preferencesMigration, /CREATE(?: UNIQUE)? INDEX/i);
+});
+
+test('privacy migrations support asynchronous deletion and hashed rate-limit buckets', () => {
+  assert.match(migration, /deletion_requested_at timestamptz/i);
+  assert.match(migration, /deleted_at timestamptz/i);
+  assert.match(privacyMigration, /identity\.privacy_requests/i);
+  assert.match(privacyMigration, /request_type.*export.*deletion/is);
+  assert.match(privacyMigration, /retention_hold boolean NOT NULL DEFAULT false/i);
+  assert.match(rateLimitMigration, /bucket_key char\(64\) PRIMARY KEY/i);
+  assert.doesNotMatch(rateLimitMigration, /user_id|email|ip_address/i);
 });

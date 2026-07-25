@@ -1,5 +1,13 @@
 const { createHttpError } = require('@ecobazar/platform');
-const env = require('../config');
+
+// The server validates the complete environment before starting. Keeping this
+// module lazy avoids loading production-only configuration while importing the
+// router in unit tests.
+const env = {
+  get INTERNAL_SERVICE_TOKEN() {
+    return process.env.INTERNAL_SERVICE_TOKEN || process.env.SERVICE_TOKEN || '';
+  },
+};
 
 const IDENTITY_URL = 'http://identity-service:4001';
 const CATALOG_URL = 'http://catalog-service:4002';

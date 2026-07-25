@@ -2,7 +2,13 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
 const { EVENT_TYPES } = require('@ecobazar/contracts');
-const { createEvent, createHttpError, insertOutbox } = require('@ecobazar/platform');
+const {
+  createEvent,
+  createHttpError,
+  createPostgresRateLimiter,
+  createRateLimitMiddleware,
+  insertOutbox,
+} = require('@ecobazar/platform');
 const {
   clearSessionCookie,
   createSessionToken,
@@ -16,13 +22,14 @@ const {
   loginSchema,
   preferencesSchema,
   profileSchema,
+  privacyDeletionSchema,
   registerSchema,
 } = require('../services/validation');
 const {
   AVATAR_ALLOWED_MIME_TYPES,
   createAvatarProcessor,
 } = require('../services/avatar');
-const { createAvatarRateLimiter } = require('../services/avatar-rate-limit');
+const { PRIVACY_CONFIRMATION } = require('../services/privacy');
 
 const userColumns = `
   id, email, full_name, password_hash, auth_provider, role,
@@ -37,6 +44,7 @@ function createAuthRouter({
   googleClient,
   requireAuth,
   avatarStorage = null,
+  privacyCoordinator = null,
   avatarProcessor,
   avatarRateLimiter,
 } = {}) {
@@ -48,16 +56,90 @@ function createAuthRouter({
     expiresIn: config.JWT_EXPIRES_IN,
   };
   const processAvatar = avatarProcessor || createAvatarProcessor(config);
-  const rateLimiter = avatarRateLimiter || createAvatarRateLimiter({
-    maxAttempts: config.AVATAR_RATE_LIMIT_MAX,
-    windowMs: config.AVATAR_RATE_LIMIT_WINDOW_MS,
+  const rateLimiter = avatarRateLimiter || createPostgresRateLimiter({
+    db,
+    scope: 'identity:avatar',
+    maxAttempts: config.AVATAR_RATE_LIMIT_MAX || 10,
+    windowMs: config.AVATAR_RATE_LIMIT_WINDOW_MS || 60 * 60 * 1000,
+    hashSecret: config.RATE_LIMIT_HASH_KEY,
   });
   const profileUpload = createProfileUploadMiddleware({
     config,
     rateLimiter,
   });
+  const mutationRateLimiter = createPostgresRateLimiter({
+    db,
+    scope: 'identity:mutation',
+    maxAttempts: config.RATE_LIMIT_MUTATION_MAX || 120,
+    windowMs: config.RATE_LIMIT_MUTATION_WINDOW_MS || 60 * 60 * 1000,
+    hashSecret: config.RATE_LIMIT_HASH_KEY,
+  });
+  const loginRateLimiter = createPostgresRateLimiter({
+    db,
+    scope: 'identity:login',
+    maxAttempts: config.LOGIN_RATE_LIMIT_MAX || 10,
+    windowMs: config.LOGIN_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000,
+    hashSecret: config.RATE_LIMIT_HASH_KEY,
+  });
+  const registerRateLimiter = createPostgresRateLimiter({
+    db,
+    scope: 'identity:register',
+    maxAttempts: config.REGISTER_RATE_LIMIT_MAX || 10,
+    windowMs: config.REGISTER_RATE_LIMIT_WINDOW_MS || 60 * 60 * 1000,
+    hashSecret: config.RATE_LIMIT_HASH_KEY,
+  });
+  const googleRateLimiter = createPostgresRateLimiter({
+    db,
+    scope: 'identity:google',
+    maxAttempts: config.GOOGLE_RATE_LIMIT_MAX || 20,
+    windowMs: config.GOOGLE_RATE_LIMIT_WINDOW_MS || 60 * 60 * 1000,
+    hashSecret: config.RATE_LIMIT_HASH_KEY,
+  });
+  const exportRateLimiter = createPostgresRateLimiter({
+    db,
+    scope: 'identity:privacy-export',
+    maxAttempts: config.PRIVACY_RATE_LIMIT_MAX || 6,
+    windowMs: config.PRIVACY_RATE_LIMIT_WINDOW_MS || 24 * 60 * 60 * 1000,
+    hashSecret: config.RATE_LIMIT_HASH_KEY,
+  });
+  const deletionRateLimiter = createPostgresRateLimiter({
+    db,
+    scope: 'identity:privacy-deletion',
+    maxAttempts: config.PRIVACY_RATE_LIMIT_MAX || 6,
+    windowMs: config.PRIVACY_RATE_LIMIT_WINDOW_MS || 24 * 60 * 60 * 1000,
+    hashSecret: config.RATE_LIMIT_HASH_KEY,
+  });
+  const rateLimitMutation = createRateLimitMiddleware({
+    limiter: mutationRateLimiter,
+    keyResolver: (req) => `${req.user?.id || getClientIp(req)}:${req.path}`,
+  });
+  const rateLimitLogin = createRateLimitMiddleware({
+    limiter: loginRateLimiter,
+    keyResolver: (req) => `${getClientIp(req)}:${String(req.body?.email || '').trim().toLowerCase() || 'unknown'}`,
+    message: 'Demasiados intentos de inicio de sesión. Inténtalo más tarde.',
+  });
+  const rateLimitRegister = createRateLimitMiddleware({
+    limiter: registerRateLimiter,
+    keyResolver: (req) => getClientIp(req),
+    message: 'Demasiados registros desde esta conexión. Inténtalo más tarde.',
+  });
+  const rateLimitGoogle = createRateLimitMiddleware({
+    limiter: googleRateLimiter,
+    keyResolver: (req) => getClientIp(req),
+    message: 'Demasiados intentos con Google. Inténtalo más tarde.',
+  });
+  const rateLimitExport = createRateLimitMiddleware({
+    limiter: exportRateLimiter,
+    keyResolver: (req) => req.user.id,
+    message: 'Has alcanzado el límite temporal de exportaciones.',
+  });
+  const rateLimitDeletion = createRateLimitMiddleware({
+    limiter: deletionRateLimiter,
+    keyResolver: (req) => req.user.id,
+    message: 'Has alcanzado el límite temporal de solicitudes de eliminación.',
+  });
 
-  router.post('/register', async (req, res, next) => {
+  router.post('/register', rateLimitRegister, async (req, res, next) => {
     try {
       const input = parseBody(registerSchema, req.body);
       const passwordHash = await bcrypt.hash(input.password, 12);
@@ -88,7 +170,7 @@ function createAuthRouter({
     }
   });
 
-  router.post('/login', async (req, res, next) => {
+  router.post('/login', rateLimitLogin, async (req, res, next) => {
     try {
       const input = parseBody(loginSchema, req.body);
       const result = await db.query(
@@ -152,15 +234,56 @@ function createAuthRouter({
     res.json({ user: serializeUser(req.user) });
   });
 
-  router.patch('/preferences', requireAuth, createUpdatePreferencesHandler({ db }));
+  router.patch('/preferences', requireAuth, rateLimitMutation, createUpdatePreferencesHandler({ db }));
   router.patch(
     '/profile',
     requireAuth,
+    rateLimitMutation,
     profileUpload,
     createUpdateProfileHandler({ db, avatarStorage, processAvatar }),
   );
 
-  router.post('/google', async (req, res, next) => {
+  router.get('/privacy/export', requireAuth, rateLimitExport, async (req, res, next) => {
+    try {
+      if (!privacyCoordinator) {
+        throw createHttpError('Privacy export is not configured', 503, {
+          code: 'PRIVACY_EXPORT_UNAVAILABLE',
+        });
+      }
+      res.json(await privacyCoordinator.exportUser(req.user, req.correlationId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/privacy/deletion-request', requireAuth, rateLimitDeletion, async (req, res, next) => {
+    try {
+      const input = parseBody(privacyDeletionSchema, req.body);
+      if (input.confirmation !== PRIVACY_CONFIRMATION) {
+        throw createHttpError('Debes escribir ELIMINAR para confirmar.', 400, {
+          code: 'PRIVACY_CONFIRMATION_REQUIRED',
+        });
+      }
+      if (!privacyCoordinator) {
+        throw createHttpError('Privacy deletion is not configured', 503, {
+          code: 'PRIVACY_DELETION_UNAVAILABLE',
+        });
+      }
+      const request = await privacyCoordinator.requestDeletion(
+        req.user.id,
+        req.correlationId,
+      );
+      clearSessionCookie(res, config.COOKIE_NAME, config.NODE_ENV);
+      res.status(202).json({
+        request_id: request.id,
+        status: request.status,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/google', rateLimitGoogle, async (req, res, next) => {
     try {
       if (!config.GOOGLE_CLIENT_ID) {
         throw createHttpError('GOOGLE_CLIENT_ID is not configured', 503);
@@ -318,7 +441,7 @@ function createProfileUploadMiddleware({ config = {}, rateLimiter } = {}) {
     },
   });
 
-  return function parseProfileRequest(req, res, next) {
+  return async function parseProfileRequest(req, res, next) {
     if (req.is?.('application/json')) return next();
     if (!req.is?.('multipart/form-data')) {
       const error = createHttpError(
@@ -330,27 +453,32 @@ function createProfileUploadMiddleware({ config = {}, rateLimiter } = {}) {
       return next(error);
     }
 
-    const rateLimitResult = rateLimiter?.consume(req.user?.id || 'anonymous');
-    if (rateLimitResult && !rateLimitResult.allowed) {
-      res.set('Retry-After', String(rateLimitResult.retryAfterSeconds));
-      const error = createHttpError(
-        'Has alcanzado el límite temporal de cambios de avatar.',
-        429,
-        {
-          code: 'AVATAR_RATE_LIMITED',
-          retry_after_seconds: rateLimitResult.retryAfterSeconds,
-        },
-      );
-      logAvatarFailure(console, req, error, 'avatar_rate_limited');
+    try {
+      const rateLimitResult = await rateLimiter?.consume(req.user?.id || 'anonymous');
+      if (rateLimitResult && !rateLimitResult.allowed) {
+        res.set('Retry-After', String(rateLimitResult.retryAfterSeconds));
+        const error = createHttpError(
+          'Has alcanzado el límite temporal de cambios de avatar.',
+          429,
+          {
+            code: 'AVATAR_RATE_LIMITED',
+            retry_after_seconds: rateLimitResult.retryAfterSeconds,
+          },
+        );
+        logAvatarFailure(console, req, error, 'avatar_rate_limited');
+        return next(error);
+      }
+
+      return upload.single('avatar')(req, res, (error) => {
+        if (!error) return next();
+        const normalized = normalizeMultipartError(error);
+        logAvatarFailure(console, req, normalized, 'multipart_rejected');
+        return next(normalized);
+      });
+    } catch (error) {
+      logAvatarFailure(console, req, error, 'avatar_rate_limit_failed');
       return next(error);
     }
-
-    return upload.single('avatar')(req, res, (error) => {
-      if (!error) return next();
-      const normalized = normalizeMultipartError(error);
-      logAvatarFailure(console, req, normalized, 'multipart_rejected');
-      return next(normalized);
-    });
   };
 }
 
@@ -413,6 +541,10 @@ function logAvatarFailure(logger, req, error, fallbackReason) {
   const reason = error?.details?.code || fallbackReason;
   const message = `[identity-service] correlation_id=${req.correlationId || 'unknown'} user_id=${req.user?.id || 'unknown'} reason=${reason}`;
   if (typeof logger?.warn === 'function') logger.warn(message);
+}
+
+function getClientIp(req) {
+  return req.get?.('x-client-ip') || req.ip || 'unknown';
 }
 
 async function findOrCreateGoogleUser(client, payload) {
@@ -518,4 +650,5 @@ module.exports = {
   createUpdatePreferencesHandler,
   createUpdateProfileHandler,
   normalizeMultipartError,
+  getClientIp,
 };

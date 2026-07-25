@@ -1,6 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createEvent, createHttpError, errorHandler } = require('../src');
+const {
+  createEvent,
+  createHttpError,
+  errorHandler,
+  requireInternalToken,
+} = require('../src');
 const { EVENT_TYPES } = require('@ecobazar/contracts');
 
 test('creates event envelopes with correlation metadata', () => {
@@ -34,6 +39,19 @@ test('error handler preserves client error responses', () => {
   });
 });
 
+test('internal routes require the exact server token', () => {
+  const middleware = requireInternalToken('internal-token-that-is-long-enough');
+  const outcomes = [];
+  const request = (token) => ({
+    get(name) {
+      return name === 'x-internal-token' ? token : undefined;
+    },
+  });
+  middleware(request('forged'), {}, (error) => outcomes.push(error?.status || 200));
+  middleware(request('internal-token-that-is-long-enough'), {}, (error) => outcomes.push(error?.status || 200));
+  assert.deepEqual(outcomes, [401, 200]);
+});
+
 test('error handler hides internal error messages and details', (t) => {
   const logged = [];
   t.mock.method(console, 'error', (...args) => logged.push(args));
@@ -55,7 +73,10 @@ test('error handler hides internal error messages and details', (t) => {
     },
   });
   assert.equal(logged.length, 1);
-  assert.equal(logged[0][1], error);
+  assert.equal(logged[0].length, 1);
+  const record = JSON.parse(logged[0][0]);
+  assert.equal(record.error.details_code, '22P02');
+  assert.doesNotMatch(logged[0][0], /quantity|UPDATE cart_items|column/i);
 });
 
 test('error handler preserves stable operational codes for server errors', (t) => {
@@ -74,6 +95,21 @@ test('error handler preserves stable operational codes for server errors', (t) =
       details: { code: 'STRIPE_UNAVAILABLE' },
     },
   });
+});
+
+test('safe error logs redact provider secrets and never include request bodies', (t) => {
+  const logged = [];
+  t.mock.method(console, 'error', (...args) => logged.push(args));
+  const error = createHttpError(
+    'Supabase sb_secret_do_not-log and Stripe sk_live_do-not-log failed',
+    500,
+    { code: 'DEPENDENCY_FAILURE', body: { image: 'binary-content' } },
+  );
+  runErrorHandler(error);
+
+  assert.equal(logged.length, 1);
+  assert.doesNotMatch(logged[0][0], /sb_secret|sk_live|binary-content|image/);
+  assert.match(logged[0][0], /DEPENDENCY_FAILURE/);
 });
 
 test('error handler rejects internal-looking and database server error codes', (t) => {

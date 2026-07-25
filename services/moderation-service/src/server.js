@@ -3,7 +3,11 @@ const env = require('./config');
 const { createApp } = require('./app');
 
 const db = createDb({ connectionString: env.DATABASE_URL, schema: 'moderation' });
-const server = createApp({ db }).listen(env.PORT, () => {
+const server = createApp({
+  db,
+  internalToken: env.INTERNAL_SERVICE_TOKEN,
+  config: env,
+}).listen(env.PORT, () => {
   console.log(`[moderation-service] port=${env.PORT} step=listening`);
 });
 

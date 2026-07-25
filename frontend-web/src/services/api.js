@@ -26,6 +26,13 @@ const PUBLIC_ERROR_MESSAGES = {
   SERVICE_UNAVAILABLE: 'El servicio no está disponible por el momento.',
   NETWORK_ERROR: 'No pudimos conectarnos con EcoBazar. Inténtalo de nuevo.',
   INTERNAL_ERROR: 'Ocurrió un problema. Inténtalo de nuevo.',
+  RATE_LIMITED: 'Has realizado demasiadas solicitudes. Inténtalo más tarde.',
+  AVATAR_RATE_LIMITED: 'Has alcanzado el límite de cambios de foto. Inténtalo más tarde.',
+  AVATAR_STORAGE_UNAVAILABLE: 'No pudimos guardar la foto por el momento. Inténtalo de nuevo.',
+  PRIVACY_CONFIRMATION_REQUIRED: 'Escribe ELIMINAR para confirmar esta acción.',
+  PRIVACY_EXPORT_UNAVAILABLE: 'La exportación no está disponible por el momento.',
+  PRIVACY_DELETION_UNAVAILABLE: 'La eliminación no está disponible por el momento.',
+  PRIVACY_SERVICE_UNAVAILABLE: 'No pudimos consultar todos tus datos por el momento.',
 }
 
 async function request(path, options = {}) {

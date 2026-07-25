@@ -28,6 +28,8 @@ flowchart LR
 
 La explicación completa de servicios, schemas, APIs, Saga, Stripe, Outbox/Inbox, eventos, base de datos y operación está en [DOCUMENTACION_TECNICA.md](DOCUMENTACION_TECNICA.md).
 
+La documentación de privacidad, retención y controles de datos está en [aviso simplificado](docs/AVISO_PRIVACIDAD_SIMPLIFICADO.md), [aviso integral](docs/AVISO_PRIVACIDAD_INTEGRAL.md) y [política de retención](docs/POLITICA_RETENCION_Y_CONTROLES.md). Antes de producción se deben sustituir los campos entre corchetes y validar los plazos con asesoría legal.
+
 ## Requisitos
 
 Para ejecutar toda la aplicación sólo necesitas:
@@ -239,6 +241,8 @@ La clave debe ser una clave privada de servidor y no debe comenzar con `VITE_`, 
 Después de cambiar código o dependencias usa `docker compose up --build -d`; `docker compose restart` sólo reinicia la imagen que ya estaba construida. Después de cambiar únicamente `.env`, recrea al menos `identity-service` con `docker compose up -d --force-recreate identity-service`.
 
 Consulta la [documentación de buckets de Supabase](https://supabase.com/docs/guides/storage/buckets/fundamentals) y la de [control de acceso de Storage](https://supabase.com/docs/guides/storage/security/access-control) al endurecer el proyecto para producción.
+
+En `Cuenta` también están disponibles `Descargar mis datos` y `Solicitar eliminación`. La descarga consulta `GET /api/auth/privacy/export`; la eliminación usa `POST /api/auth/privacy/deletion-request`, revoca la sesión de inmediato y termina de forma asíncrona mediante los servicios internos. Ambas acciones tienen rate limiting persistido en PostgreSQL.
 
 ## Configurar Stripe Sandbox En Windows O macOS
 

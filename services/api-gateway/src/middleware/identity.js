@@ -1,9 +1,11 @@
 const jwt = require('jsonwebtoken');
+const { safeLog } = require('@ecobazar/platform');
 
 const IDENTITY_HEADERS = Object.freeze([
   'x-user-id',
   'x-user-role',
   'x-user-name',
+  'x-client-ip',
 ]);
 const ROLES = new Set(['cliente', 'vendedor', 'admin']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -44,9 +46,11 @@ function createIdentityMiddleware({ config, publicKey, fetchImpl = fetch }) {
       req.headers['x-user-name'] = identity.name;
     } catch (error) {
       req.authError = error;
-      console.log(
-        `[api-gateway] correlation_id=${req.correlationId} step=session_ignored reason=invalid_or_expired`,
-      );
+      safeLog('warn', 'api-gateway', {
+        correlation_id: req.correlationId,
+        step: 'session_ignored',
+        reason: 'invalid_or_expired',
+      });
     }
     return next();
   };

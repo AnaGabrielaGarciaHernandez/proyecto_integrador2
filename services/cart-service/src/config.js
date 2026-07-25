@@ -13,6 +13,9 @@ const EnvSchema = z.object({
   INTERNAL_SERVICE_TOKEN: z.string().min(16),
   OUTBOX_INTERVAL_MS: z.coerce.number().int().positive().default(1000),
   CATALOG_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  RATE_LIMIT_HASH_KEY: z.string().min(16).default('ecobazar-development-rate-limit-secret'),
+  RATE_LIMIT_MUTATION_MAX: z.coerce.number().int().positive().default(120),
+  RATE_LIMIT_MUTATION_WINDOW_MS: z.coerce.number().int().positive().default(3600000),
 });
 
 function loadConfig(source = process.env) {

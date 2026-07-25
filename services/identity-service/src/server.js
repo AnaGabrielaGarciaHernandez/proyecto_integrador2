@@ -6,6 +6,7 @@ const {
 const { createApp } = require('./app');
 const env = require('./config/env');
 const { loadPrivateKey } = require('./config/keys');
+const { safeLog } = require('@ecobazar/platform');
 
 async function start() {
   const privateKey = loadPrivateKey(env);
@@ -23,6 +24,8 @@ async function start() {
     intervalMs: env.OUTBOX_INTERVAL_MS,
   });
   const app = createApp({ db, config: env, privateKey });
+  const privacyCoordinator = app.locals.privacyCoordinator;
+  const stopPrivacy = privacyCoordinator?.start?.() || (async () => {});
   const server = app.listen(env.PORT, () => {
     console.log(`[identity-service] port=${env.PORT} step=service_started`);
   });
@@ -35,12 +38,13 @@ async function start() {
     server.close(async () => {
       try {
         await stopOutbox();
+        await stopPrivacy();
         await bus.close();
         await db.close();
         console.log('[identity-service] step=shutdown_finished');
         process.exitCode = 0;
       } catch (error) {
-        console.error('[identity-service] step=shutdown_failed', error);
+        safeLog('error', 'identity-service', { step: 'shutdown_failed' }, error);
         process.exitCode = 1;
       }
     });
@@ -53,7 +57,7 @@ async function start() {
 
 if (require.main === module) {
   start().catch((error) => {
-    console.error('[identity-service] step=startup_failed', error);
+    safeLog('error', 'identity-service', { step: 'startup_failed' }, error);
     process.exitCode = 1;
   });
 }

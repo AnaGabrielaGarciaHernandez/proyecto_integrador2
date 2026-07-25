@@ -1,5 +1,7 @@
 const { EVENT_TYPES } = require('@ecobazar/contracts');
-const { createEvent, insertOutbox } = require('@ecobazar/platform');
+const platform = require('@ecobazar/platform');
+const { createEvent, insertOutbox } = platform;
+const safeLog = platform.safeLog || (() => {});
 
 const FAILURE_EVENTS = new Set([
   EVENT_TYPES.PAYMENT_FAILED,
@@ -77,7 +79,12 @@ function createPaymentEventHandler({ orders, catalogClient }) {
          updated_at = now() WHERE order_id = $1 AND status <> 'paid'`,
         [orderId, `${reason}: ${error.message}`],
       );
-      console.error(`[order-service] correlation_id=${event.correlation_id} event_type=${event.event_type} step=inventory_release_failed order_id=${orderId}`, error);
+      safeLog('error', 'order-service', {
+        correlation_id: event.correlation_id,
+        event_type: event.event_type,
+        step: 'inventory_release_failed',
+        order_id: orderId,
+      }, error);
     }
   };
 }

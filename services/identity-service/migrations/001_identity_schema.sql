@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS identity.users (
   is_active boolean NOT NULL DEFAULT true,
   email_verified_at timestamptz,
   last_login_at timestamptz,
+  deletion_requested_at timestamptz,
+  deleted_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT users_email_format_chk CHECK (

@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS reviews (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id uuid NOT NULL,
-  buyer_id uuid NOT NULL,
+  buyer_id uuid,
   seller_id uuid NOT NULL,
   rating smallint NOT NULL CHECK (rating BETWEEN 1 AND 5),
   comment text,
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 CREATE TABLE IF NOT EXISTS reports (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  reporter_id uuid NOT NULL,
+  reporter_id uuid,
   target_type varchar(40) NOT NULL CHECK (target_type IN ('product', 'seller', 'bazaar', 'user')),
   target_id uuid NOT NULL,
   reason varchar(180) NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS reports (
 
 CREATE TABLE IF NOT EXISTS admin_actions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  admin_id uuid NOT NULL,
+  admin_id uuid,
   action varchar(120) NOT NULL,
   target_table varchar(120) NOT NULL,
   target_id uuid NOT NULL,

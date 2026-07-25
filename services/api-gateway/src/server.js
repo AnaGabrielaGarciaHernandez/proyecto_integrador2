@@ -1,6 +1,7 @@
 const { createApp } = require('./app');
 const env = require('./config/env');
 const { loadPublicKey } = require('./config/keys');
+const { safeLog } = require('@ecobazar/platform');
 
 function start() {
   const publicKey = loadPublicKey(env);
@@ -16,7 +17,7 @@ function start() {
     console.log(`[api-gateway] signal=${signal} step=shutdown_started`);
     server.close((error) => {
       if (error) {
-        console.error('[api-gateway] step=shutdown_failed', error);
+        safeLog('error', 'api-gateway', { step: 'shutdown_failed' }, error);
         process.exitCode = 1;
         return;
       }
@@ -34,7 +35,7 @@ if (require.main === module) {
   try {
     start();
   } catch (error) {
-    console.error('[api-gateway] step=startup_failed', error);
+    safeLog('error', 'api-gateway', { step: 'startup_failed' }, error);
     process.exitCode = 1;
   }
 }

@@ -133,6 +133,18 @@ export function AuthProvider({ children }) {
     return data.user
   }, [])
 
+  const exportPrivacyData = useCallback(async () => (
+    get('/auth/privacy/export')
+  ), [])
+
+  const requestAccountDeletion = useCallback(async () => {
+    const data = await post('/auth/privacy/deletion-request', { confirmation: 'ELIMINAR' })
+    commitSessionUser(null)
+    window.dispatchEvent(new Event('authActualizado'))
+    window.dispatchEvent(new Event('carritoActualizado'))
+    return data
+  }, [commitSessionUser])
+
   const value = useMemo(() => ({
     user,
     loading,
@@ -142,6 +154,8 @@ export function AuthProvider({ children }) {
     loginWithGoogleToken,
     updatePreferences,
     updateProfile,
+    exportPrivacyData,
+    requestAccountDeletion,
   }), [
     user,
     loading,
@@ -151,6 +165,8 @@ export function AuthProvider({ children }) {
     loginWithGoogleToken,
     updatePreferences,
     updateProfile,
+    exportPrivacyData,
+    requestAccountDeletion,
   ])
 
   return (

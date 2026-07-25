@@ -2,18 +2,31 @@ const express = require('express');
 const {
   correlationMiddleware,
   requestLogger,
+  createPostgresRateLimiter,
+  createRateLimitMiddleware,
   requireInternalToken,
   createHttpError,
   notFound,
   errorHandler,
 } = require('@ecobazar/platform');
 
-function createApp({ db, serviceToken, checkoutService, webhookService }) {
+function createApp({ db, serviceToken, checkoutService, webhookService, config = {} }) {
   const app = express();
   app.use(correlationMiddleware('payment-service'));
   app.use(requestLogger('payment-service'));
+  const webhookLimiter = createPostgresRateLimiter({
+    db,
+    scope: 'payment:webhook',
+    maxAttempts: Number(config.RATE_LIMIT_MUTATION_MAX || 120),
+    windowMs: Number(config.RATE_LIMIT_MUTATION_WINDOW_MS || 60 * 60 * 1000),
+    hashSecret: config.RATE_LIMIT_HASH_KEY,
+  });
+  const webhookRateLimit = createRateLimitMiddleware({
+    limiter: webhookLimiter,
+    keyResolver: (req) => req.get('x-client-ip') || req.ip || 'unknown',
+  });
 
-  app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res, next) => {
+  app.post('/api/stripe/webhook', webhookRateLimit, express.raw({ type: 'application/json' }), async (req, res, next) => {
     try {
       const event = webhookService.constructEvent(req.body, req.get('stripe-signature'));
       await webhookService.processEvent(event);
@@ -47,6 +60,57 @@ function createApp({ db, serviceToken, checkoutService, webhookService }) {
     try {
       ensureUuid(req.params.orderId);
       res.json(await checkoutService.expireCheckout(req.params.orderId, req.correlationId));
+    } catch (error) {
+      next(error);
+    }
+  });
+  internal.get('/privacy/users/:userId/export', async (req, res, next) => {
+    try {
+      ensureUuid(req.params.userId);
+      const result = await db.query(
+        `SELECT id, order_id, buyer_id, provider, status, amount_cents,
+                currency, stripe_checkout_session_id, stripe_payment_intent_id,
+                stripe_charge_id, stripe_receipt_url, checkout_expires_at,
+                failure_code, created_at, updated_at
+         FROM payment.payments
+         WHERE buyer_id = $1
+         ORDER BY created_at DESC`,
+        [req.params.userId],
+      );
+      res.json({ data: { payments: result.rows } });
+    } catch (error) {
+      next(error);
+    }
+  });
+  internal.post('/privacy/users/:userId/anonymize', async (req, res, next) => {
+    try {
+      ensureUuid(req.params.userId);
+      const result = await db.transaction(async (client) => {
+        const payments = await client.query(
+          `UPDATE payment.payments
+           SET buyer_id = md5($1::text)::uuid,
+               stripe_checkout_url = NULL,
+               stripe_receipt_url = NULL,
+               failure_message = NULL,
+               raw_event = NULL,
+               updated_at = now()
+           WHERE buyer_id = $1
+           RETURNING order_id`,
+          [req.params.userId],
+        );
+        await client.query(
+          `UPDATE payment.stripe_events se
+           SET raw_event = jsonb_build_object(
+             'redacted', true,
+             'event_id', se.event_id,
+             'event_type', se.event_type
+           )
+           WHERE se.order_id = ANY($1::uuid[])`,
+          [payments.rows.map((row) => row.order_id)],
+        );
+        return payments.rowCount;
+      });
+      res.json({ service: 'payment', status: 'completed', payments: result });
     } catch (error) {
       next(error);
     }

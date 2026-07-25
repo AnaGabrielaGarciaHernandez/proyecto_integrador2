@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Users, CheckCircle, XCircle, PauseCircle, Trash2, Shield, Activity, BarChart
+  Users, CheckCircle, XCircle, Trash2, Shield, Activity, BarChart
 } from 'lucide-react'
 import { get, patch, post, del } from '../services/api'
 import '../styles/AdminScreen.css'
@@ -58,7 +58,7 @@ export default function AdminScreen() {
   }
 
   async function handleDeleteUser(id) {
-    if (!window.confirm('¿Estás seguro de ELIMINAR definitivamente a este usuario?')) return
+    if (!window.confirm('¿Solicitar la eliminación y anonimización de este usuario?')) return
     try {
       await del(`/admin/users/${id}`)
       fetchData()

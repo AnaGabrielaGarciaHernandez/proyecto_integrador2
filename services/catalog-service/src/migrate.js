@@ -1,5 +1,5 @@
 const path = require('node:path');
-const { createDb, runMigrations } = require('@ecobazar/platform');
+const { createDb, runMigrations, safeLog } = require('@ecobazar/platform');
 const { loadConfig } = require('./config');
 
 async function main() {
@@ -13,6 +13,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('[catalog-service] step=migration_failed', error);
+    safeLog('error', 'catalog-service', { step: 'migration_failed' }, error);
   process.exitCode = 1;
 });

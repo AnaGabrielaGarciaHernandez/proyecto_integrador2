@@ -8,6 +8,7 @@ const {
   errorHandler,
   notFound,
   requestLogger,
+  safeLog,
 } = require('@ecobazar/platform');
 const { createIdentityMiddleware } = require('./middleware/identity');
 const { checkServices } = require('./services/health');
@@ -33,6 +34,11 @@ function createApp({ config, publicKey, fetchImpl } = {}) {
   app.use(requestLogger('api-gateway'));
   app.use(cookieParser());
   app.use(createIdentityMiddleware({ config, publicKey, fetchImpl }));
+  app.use((req, res, next) => {
+    void res;
+    req.headers['x-client-ip'] = req.ip || 'unknown';
+    next();
+  });
 
   app.get('/health/live', (req, res) => res.json({ ok: true }));
   const readiness = async (req, res, next) => {
@@ -61,10 +67,11 @@ function createApp({ config, publicKey, fetchImpl } = {}) {
         proxyReq.setHeader('x-correlation-id', req.correlationId);
       },
       error: (error, req, res) => {
-        console.error(
-          `[api-gateway] correlation_id=${req.correlationId} service=${req.ecobazarService || 'unknown'} step=proxy_failed`,
-          error,
-        );
+        safeLog('error', 'api-gateway', {
+          correlation_id: req.correlationId,
+          target_service: req.ecobazarService || 'unknown',
+          step: 'proxy_failed',
+        }, error);
         if (res.headersSent) {
           res.destroy(error);
           return;

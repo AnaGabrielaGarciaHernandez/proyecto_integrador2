@@ -7,14 +7,16 @@ const {
   errorHandler,
   notFound,
   requestLogger,
+  safeLog,
 } = require('@ecobazar/platform');
 const { createRequireAuth } = require('./middleware/auth');
 const { createRequireInternalToken } = require('./middleware/internal');
 const { createAuthRouter } = require('./routes/auth.routes');
 const { createInternalRouter } = require('./routes/internal.routes');
 const { createAvatarStorage } = require('./services/avatar-storage');
+const { createPrivacyCoordinator } = require('./services/privacy');
 
-function createApp({ db, config, privateKey, googleClient, avatarStorage } = {}) {
+function createApp({ db, config, privateKey, googleClient, avatarStorage, privacyCoordinator } = {}) {
   if (!db || !config || !privateKey) {
     throw new Error('createApp requires db, config and privateKey');
   }
@@ -27,8 +29,15 @@ function createApp({ db, config, privateKey, googleClient, avatarStorage } = {})
   const resolvedAvatarStorage = avatarStorage === undefined
     ? createAvatarStorage(config)
     : avatarStorage;
-
+  const resolvedPrivacyCoordinator = privacyCoordinator === undefined
+    ? createPrivacyCoordinator({
+      db,
+      config,
+      avatarStorage: resolvedAvatarStorage,
+    })
+    : privacyCoordinator;
   const app = express();
+  app.locals.privacyCoordinator = resolvedPrivacyCoordinator;
   app.disable('x-powered-by');
   app.use(correlationMiddleware('identity-service'));
   app.use(requestLogger('identity-service'));
@@ -42,10 +51,10 @@ function createApp({ db, config, privateKey, googleClient, avatarStorage } = {})
       await db.health();
       res.json({ ok: true });
     } catch (error) {
-      console.error(
-        `[identity-service] correlation_id=${req.correlationId} step=readiness_failed`,
-        error,
-      );
+      safeLog('error', 'identity-service', {
+        correlation_id: req.correlationId,
+        step: 'readiness_failed',
+      }, error);
       res.status(503).json({ ok: false, error: 'Database unavailable' });
     }
   });
@@ -58,8 +67,13 @@ function createApp({ db, config, privateKey, googleClient, avatarStorage } = {})
     googleClient: oauthClient,
     requireAuth,
     avatarStorage: resolvedAvatarStorage,
+    privacyCoordinator: resolvedPrivacyCoordinator,
   }));
-  app.use('/internal', createInternalRouter({ db, requireInternalToken }));
+  app.use('/internal', createInternalRouter({
+    db,
+    requireInternalToken,
+    privacyCoordinator: resolvedPrivacyCoordinator,
+  }));
 
   app.use(notFound);
   app.use(errorHandler);

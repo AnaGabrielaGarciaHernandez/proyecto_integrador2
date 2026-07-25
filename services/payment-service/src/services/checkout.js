@@ -1,5 +1,5 @@
 const { PaymentCheckoutRequestSchema } = require('@ecobazar/contracts');
-const { createHttpError } = require('@ecobazar/platform');
+const { createHttpError, safeLog } = require('@ecobazar/platform');
 
 function createPaymentCheckoutService({ payments, stripeProvider, clientOrigin }) {
   async function createCheckout(input, correlationId) {
@@ -73,7 +73,12 @@ function createPaymentCheckoutService({ payments, stripeProvider, clientOrigin }
         throw stripeStateUncertain(error, request.order_id);
       }
       await payments.markCreationFailed(request.order_id, correlationId, error).catch((dbError) => {
-        console.error(`[payment-service] correlation_id=${correlationId} event_type=payment.checkout.failed.v1 step=failure_persist_failed order_id=${request.order_id}`, dbError);
+        safeLog('error', 'payment-service', {
+          correlation_id: correlationId,
+          event_type: 'payment.checkout.failed.v1',
+          step: 'failure_persist_failed',
+          order_id: request.order_id,
+        }, dbError);
       });
       throw stripeUnavailable(error);
     }

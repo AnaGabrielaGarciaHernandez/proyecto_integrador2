@@ -22,6 +22,56 @@ function createInternalRouter({ db, internalToken }) {
     }
   });
 
+  router.get('/privacy/users/:userId/export', async (req, res, next) => {
+    try {
+      const userId = parse(z.string().uuid(), req.params.userId);
+      const cart = await db.query(
+        `SELECT sc.id, sc.buyer_id, sc.created_at, sc.updated_at,
+                COALESCE(json_agg(
+                  json_build_object(
+                    'id', ci.id,
+                    'variant_id', ci.variant_id,
+                    'product_id', ci.product_id,
+                    'seller_id', ci.seller_id,
+                    'product_name', ci.product_name,
+                    'size_name', ci.size_name,
+                    'seller_name', ci.seller_name,
+                    'quantity', ci.quantity,
+                    'unit_price_cents', ci.unit_price_cents,
+                    'currency', ci.currency,
+                    'created_at', ci.created_at,
+                    'updated_at', ci.updated_at
+                  ) ORDER BY ci.created_at
+                ) FILTER (WHERE ci.id IS NOT NULL), '[]'::json) AS items
+         FROM shopping_carts sc
+         LEFT JOIN cart_items ci ON ci.cart_id = sc.id
+         WHERE sc.buyer_id = $1
+         GROUP BY sc.id`,
+        [userId],
+      );
+      res.json({ data: { cart: cart.rows[0] || null } });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/privacy/users/:userId/anonymize', async (req, res, next) => {
+    try {
+      const userId = parse(z.string().uuid(), req.params.userId);
+      const result = await db.query(
+        'DELETE FROM shopping_carts WHERE buyer_id = $1 RETURNING id',
+        [userId],
+      );
+      res.json({
+        service: 'cart',
+        status: 'completed',
+        deleted_carts: result.rowCount,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 }
 

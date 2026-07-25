@@ -3,6 +3,11 @@ name: ecobazar
 x-service-common: &service-common
   restart: unless-stopped
   networks: [ecobazar-internal]
+  logging:
+    driver: json-file
+    options:
+      max-size: "${LOG_MAX_SIZE:-10m}"
+      max-file: "${LOG_MAX_FILE:-5}"
   healthcheck:
     test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT}/health/ready >/dev/null || exit 1"]
     interval: 5s
@@ -13,6 +18,9 @@ x-service-common: &service-common
     NODE_ENV: development
     RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-ecobazar}:${RABBITMQ_DEFAULT_PASS:-ecobazar_dev}@rabbitmq:5672
     INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change_this_internal_token_32_chars}
+    RATE_LIMIT_HASH_KEY: ${RATE_LIMIT_HASH_KEY:-change_this_rate_limit_hash_key_32_chars}
+    RATE_LIMIT_MUTATION_MAX: ${RATE_LIMIT_MUTATION_MAX:-120}
+    RATE_LIMIT_MUTATION_WINDOW_MS: ${RATE_LIMIT_MUTATION_WINDOW_MS:-3600000}
     CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:5173}
   depends_on:
     postgres:
@@ -118,6 +126,14 @@ services:
       AVATAR_MAX_PIXELS: ${AVATAR_MAX_PIXELS:-16000000}
       AVATAR_RATE_LIMIT_MAX: ${AVATAR_RATE_LIMIT_MAX:-10}
       AVATAR_RATE_LIMIT_WINDOW_MS: ${AVATAR_RATE_LIMIT_WINDOW_MS:-3600000}
+      CATALOG_SERVICE_URL: http://catalog-service:4002
+      CART_SERVICE_URL: http://cart-service:4003
+      ORDER_SERVICE_URL: http://order-service:4004
+      PAYMENT_SERVICE_URL: http://payment-service:4005
+      MODERATION_SERVICE_URL: http://moderation-service:4006
+      PRIVACY_WORKER_INTERVAL_MS: ${PRIVACY_WORKER_INTERVAL_MS:-5000}
+      PRIVACY_REQUEST_TIMEOUT_MS: ${PRIVACY_REQUEST_TIMEOUT_MS:-5000}
+      PRIVACY_RETENTION_DAYS: ${PRIVACY_RETENTION_DAYS:-365}
       JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-private.pem
     volumes:
       - jwt-keys:/run/secrets:ro

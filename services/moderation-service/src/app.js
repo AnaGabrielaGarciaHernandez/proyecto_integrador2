@@ -1,19 +1,34 @@
 const express = require('express');
+const { z } = require('zod');
 const {
   correlationMiddleware,
   requestLogger,
+  createPostgresRateLimiter,
+  createRateLimitMiddleware,
   createHttpError,
+  requireInternalToken,
   notFound,
   errorHandler,
 } = require('@ecobazar/platform');
 
 const adminController = require('./controllers/admin');
 
-function createApp({ db }) {
+function createApp({ db, internalToken, config = {} }) {
   const app = express();
   app.use(correlationMiddleware('moderation-service'));
   app.use(requestLogger('moderation-service'));
   app.use(express.json({ limit: '1mb' }));
+  const mutationLimiter = createPostgresRateLimiter({
+    db,
+    scope: 'moderation:mutation',
+    maxAttempts: Number(config.RATE_LIMIT_MUTATION_MAX || 120),
+    windowMs: Number(config.RATE_LIMIT_MUTATION_WINDOW_MS || 60 * 60 * 1000),
+    hashSecret: config.RATE_LIMIT_HASH_KEY,
+  });
+  const mutationRateLimit = createRateLimitMiddleware({
+    limiter: mutationLimiter,
+    keyResolver: (req) => `${req.get('x-user-id') || 'anonymous'}:${req.path}`,
+  });
 
   app.get('/health/live', (req, res) => res.json({ status: 'live', service: 'moderation-service' }));
   app.get('/health/ready', async (req, res, next) => {
@@ -28,20 +43,87 @@ function createApp({ db }) {
   app.use('/api/reviews', requireUser, pending('Review'));
   const adminRouter = express.Router();
   adminRouter.get('/users', adminController.getUsers);
-  adminRouter.patch('/users/:id/suspend', adminController.suspendUser);
-  adminRouter.delete('/users/:id', adminController.deleteUser);
-  adminRouter.patch('/users/:id/role', adminController.changeRole);
+  adminRouter.patch('/users/:id/suspend', mutationRateLimit, adminController.suspendUser);
+  adminRouter.delete('/users/:id', mutationRateLimit, adminController.deleteUser);
+  adminRouter.patch('/users/:id/role', mutationRateLimit, adminController.changeRole);
 
   adminRouter.get('/seller-applications', adminController.getApplications);
-  adminRouter.post('/seller-applications/:id/approve', adminController.approveApplication);
-  adminRouter.post('/seller-applications/:id/reject', adminController.rejectApplication);
+  adminRouter.post('/seller-applications/:id/approve', mutationRateLimit, adminController.approveApplication);
+  adminRouter.post('/seller-applications/:id/reject', mutationRateLimit, adminController.rejectApplication);
 
   adminRouter.get('/reports/sales', adminController.getSalesReports);
 
   app.use('/api/admin', requireUser, requireAdmin, adminRouter);
+
+  const internal = express.Router();
+  internal.use(requireInternalToken(internalToken));
+  internal.get('/privacy/users/:userId/export', async (req, res, next) => {
+    try {
+      const userId = parseUuid(req.params.userId);
+      const reviews = await db.query(
+        `SELECT id, order_id, buyer_id, seller_id, rating, comment,
+                created_at, updated_at
+         FROM moderation.reviews
+         WHERE buyer_id = $1
+         ORDER BY created_at`,
+        [userId],
+      );
+      const reports = await db.query(
+        `SELECT id, reporter_id, target_type, target_id, reason, description,
+                status, reviewed_at, created_at, updated_at
+         FROM moderation.reports
+         WHERE reporter_id = $1
+         ORDER BY created_at`,
+        [userId],
+      );
+      res.json({ data: { reviews: reviews.rows, reports: reports.rows } });
+    } catch (error) {
+      next(error);
+    }
+  });
+  internal.post('/privacy/users/:userId/anonymize', async (req, res, next) => {
+    try {
+      const userId = parseUuid(req.params.userId);
+      const result = await db.transaction(async (client) => {
+        const reviews = await client.query(
+          `UPDATE moderation.reviews
+           SET buyer_id = NULL, comment = 'Contenido eliminado', updated_at = now()
+           WHERE buyer_id = $1`,
+          [userId],
+        );
+        const reports = await client.query(
+          `UPDATE moderation.reports
+           SET reporter_id = NULL, description = NULL, updated_at = now()
+           WHERE reporter_id = $1`,
+          [userId],
+        );
+        const actions = await client.query(
+          `UPDATE moderation.admin_actions
+           SET admin_id = NULL, notes = NULL
+           WHERE admin_id = $1`,
+          [userId],
+        );
+        return {
+          reviews: reviews.rowCount,
+          reports: reports.rowCount,
+          admin_actions: actions.rowCount,
+        };
+      });
+      res.json({ service: 'moderation', status: 'completed', result });
+    } catch (error) {
+      next(error);
+    }
+  });
+  app.use('/internal', internal);
   app.use(notFound);
   app.use(errorHandler);
   return app;
+}
+
+function parseUuid(value) {
+  const result = z.string().uuid().safeParse(value);
+  if (!result.success) throw createHttpError('Invalid privacy user id', 400);
+  return result.data;
 }
 
 function pending(area) {
@@ -71,4 +153,4 @@ function isUuid(value) {
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-module.exports = { createApp, pending, requireUser, requireAdmin };
+module.exports = { createApp, pending, requireUser, requireAdmin, parseUuid };

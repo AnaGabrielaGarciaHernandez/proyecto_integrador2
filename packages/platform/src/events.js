@@ -1,6 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const amqp = require('amqplib');
 const { EventEnvelopeSchema } = require('@ecobazar/contracts');
+const { safeLog } = require('./http');
 
 const EVENTS_EXCHANGE = 'ecobazar.events';
 const DLX_EXCHANGE = 'ecobazar.dlx';
@@ -39,13 +40,18 @@ function createRabbitBus({ url, serviceName }) {
   async function connect() {
     if (connection) return;
     connection = await amqp.connect(url);
-    connection.on('error', (error) => console.error(`[${serviceName}] step=rabbit_connection_error`, error));
+    connection.on('error', (error) => safeLog('error', serviceName, {
+      step: 'rabbit_connection_error',
+    }, error));
     connection.on('close', () => {
       connection = undefined;
       publishChannel = undefined;
       consumeChannel = undefined;
       if (!closing) {
-        console.error(`[${serviceName}] step=rabbit_connection_closed unexpected=true`);
+        safeLog('error', serviceName, {
+          step: 'rabbit_connection_closed',
+          unexpected: true,
+        });
         // amqplib does not restore consumers after a connection is lost. A clean
         // process restart is the smallest reliable recovery mechanism in Compose:
         // Outbox rows remain pending and Inbox keeps handlers idempotent.
@@ -139,12 +145,16 @@ function startOutboxWorker({ db, bus, serviceName, intervalMs = 1000, batchSize 
               'UPDATE message_outbox SET attempts = attempts + 1, last_error = $2 WHERE event_id = $1',
               [row.event_id, error.message],
             );
-            console.error(`[${serviceName}] correlation_id=${row.correlation_id} event_type=${row.event_type} step=outbox_publish_failed`, error);
+            safeLog('error', serviceName, {
+              correlation_id: row.correlation_id,
+              event_type: row.event_type,
+              step: 'outbox_publish_failed',
+            }, error);
           }
         }
       });
     } catch (error) {
-      console.error(`[${serviceName}] step=outbox_worker_failed`, error);
+      safeLog('error', serviceName, { step: 'outbox_worker_failed' }, error);
     } finally {
       running = false;
     }
@@ -193,18 +203,31 @@ async function startConsumer({ db, bus, serviceName, queue, bindings, handler, m
             correlationId,
             headers: { ...message.properties.headers, 'x-retry-count': retries + 1 },
           });
-          console.error(`[${serviceName}] correlation_id=${correlationId} event_type=${eventType} retry=${retries + 1} step=inbox_retry`, error);
+          safeLog('error', serviceName, {
+            correlation_id: correlationId,
+            event_type: eventType,
+            retry: retries + 1,
+            step: 'inbox_retry',
+          }, error);
         } else {
           await bus.publishToQueue(dlq, message.content, {
             contentType: 'application/json',
             correlationId,
             headers: message.properties.headers,
           });
-          console.error(`[${serviceName}] correlation_id=${correlationId} event_type=${eventType} sent_to_dlq=true`, error);
+          safeLog('error', serviceName, {
+            correlation_id: correlationId,
+            event_type: eventType,
+            sent_to_dlq: true,
+          }, error);
         }
         channel.ack(message);
       } catch (publishError) {
-        console.error(`[${serviceName}] correlation_id=${correlationId} event_type=${eventType} step=retry_publish_failed`, publishError);
+        safeLog('error', serviceName, {
+          correlation_id: correlationId,
+          event_type: eventType,
+          step: 'retry_publish_failed',
+        }, publishError);
         channel.nack(message, false, true);
       }
     }

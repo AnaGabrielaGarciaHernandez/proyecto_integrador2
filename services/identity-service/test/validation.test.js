@@ -5,6 +5,7 @@ const {
   loginSchema,
   preferencesSchema,
   profileSchema,
+  privacyDeletionSchema,
   registerSchema,
 } = require('../src/services/validation');
 
@@ -64,4 +65,12 @@ test('accepts only a present boolean home banner preference', () => {
     preferencesSchema.safeParse({ show_home_sell_banner: null }).success,
     false,
   );
+});
+
+test('privacy deletion requires the exact confirmation phrase', () => {
+  assert.deepEqual(privacyDeletionSchema.parse({ confirmation: 'ELIMINAR' }), {
+    confirmation: 'ELIMINAR',
+  });
+  assert.equal(privacyDeletionSchema.safeParse({ confirmation: 'eliminar' }).success, false);
+  assert.equal(privacyDeletionSchema.safeParse({ confirmation: 'ELIMINAR', extra: true }).success, false);
 });

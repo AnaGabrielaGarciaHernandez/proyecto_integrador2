@@ -1,5 +1,5 @@
 const path = require('node:path');
-const { createDb, runMigrations } = require('@ecobazar/platform');
+const { createDb, runMigrations, safeLog } = require('@ecobazar/platform');
 const env = require('./config/env');
 
 async function migrate() {
@@ -13,7 +13,7 @@ async function migrate() {
 
 if (require.main === module) {
   migrate().catch((error) => {
-    console.error('[identity-service] step=migration_failed', error);
+    safeLog('error', 'identity-service', { step: 'migration_failed' }, error);
     process.exitCode = 1;
   });
 }

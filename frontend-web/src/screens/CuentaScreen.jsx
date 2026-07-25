@@ -4,7 +4,7 @@ import {
   Package, Heart, MapPin,
   RefreshCw, LogOut, ChevronRight,
   Users, ShoppingBag, BarChart2, Tag, AlertCircle,
-  Pencil
+  Pencil, Download, ShieldCheck, Trash2
 } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import { DEFAULT_AVATAR_URL } from '../constants/avatar'
@@ -13,7 +13,13 @@ import '../styles/CuentaScreen.css'
 
 export default function CuentaScreen() {
   const navigate = useNavigate()
-  const { user: usuario, logout, updateProfile } = useAuth()
+  const {
+    user: usuario,
+    logout,
+    updateProfile,
+    exportPrivacyData,
+    requestAccountDeletion,
+  } = useAuth()
   const [nombreBorrador, setNombreBorrador] = useState({ userId: null, value: null })
   const [nuevaFoto, setNuevaFoto] = useState({ userId: null, file: null, url: null })
   const previewUrlRef = useRef(null)
@@ -21,6 +27,9 @@ export default function CuentaScreen() {
   const [error, setError] = useState('')
   const [mensaje, setMensaje] = useState('')
   const [mostrarEditor, setMostrarEditor] = useState(false)
+  const [privacidadCargando, setPrivacidadCargando] = useState(false)
+  const [mostrarEliminacion, setMostrarEliminacion] = useState(false)
+  const [confirmacionEliminacion, setConfirmacionEliminacion] = useState('')
 
   const nombre = nombreBorrador.userId === usuario?.id && nombreBorrador.value !== null
     ? nombreBorrador.value
@@ -43,6 +52,47 @@ export default function CuentaScreen() {
   async function handleCerrarSesion() {
     await logout()
     navigate('/')
+  }
+
+  async function handleExportarDatos() {
+    setError('')
+    setMensaje('')
+    try {
+      setPrivacidadCargando(true)
+      const data = await exportPrivacyData()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const objectUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = `ecobazar-datos-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
+      setMensaje('Preparamos una copia de tus datos.')
+    } catch (err) {
+      setError(err.message || 'No se pudo exportar tu información.')
+    } finally {
+      setPrivacidadCargando(false)
+    }
+  }
+
+  async function handleSolicitarEliminacion() {
+    if (confirmacionEliminacion !== 'ELIMINAR') {
+      setError('Escribe ELIMINAR para confirmar la eliminación de tu cuenta.')
+      return
+    }
+
+    setError('')
+    try {
+      setPrivacidadCargando(true)
+      await requestAccountDeletion()
+      navigate('/', { replace: true })
+    } catch (err) {
+      setError(err.message || 'No se pudo solicitar la eliminación de tu cuenta.')
+    } finally {
+      setPrivacidadCargando(false)
+    }
   }
 
   async function handleGuardarPerfil(event) {
@@ -308,6 +358,91 @@ export default function CuentaScreen() {
             </div>
           </>
         )}
+
+        <section className="cuenta-privacidad" aria-labelledby="cuenta-privacidad-titulo">
+          <div className="cuenta-privacidad-header">
+            <div className="cuenta-privacidad-icono">
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <h2 id="cuenta-privacidad-titulo">Privacidad y tus datos</h2>
+              <p>Consulta o controla la información asociada con tu cuenta.</p>
+            </div>
+          </div>
+
+          <div className="cuenta-privacidad-actions">
+            <button
+              type="button"
+              className="cuenta-privacidad-exportar"
+              onClick={handleExportarDatos}
+              disabled={privacidadCargando}
+            >
+              <Download size={17} />
+              {privacidadCargando ? 'Procesando...' : 'Descargar mis datos'}
+            </button>
+            <Link className="cuenta-privacidad-link" to="/privacidad">
+              Leer aviso de privacidad
+              <ChevronRight size={15} />
+            </Link>
+          </div>
+
+          <div className="cuenta-privacidad-eliminar">
+            <div>
+              <h3>Eliminar mi cuenta</h3>
+              <p>La solicitud es irreversible. Procesaremos la eliminación y conservaremos únicamente lo necesario por obligación legal.</p>
+            </div>
+            {!mostrarEliminacion ? (
+              <button
+                type="button"
+                className="cuenta-privacidad-eliminar-btn"
+                onClick={() => {
+                  setMostrarEliminacion(true)
+                  setConfirmacionEliminacion('')
+                  setError('')
+                }}
+              >
+                <Trash2 size={16} />
+                Solicitar eliminación
+              </button>
+            ) : (
+              <div className="cuenta-privacidad-confirmacion">
+                <label htmlFor="confirmar-eliminacion">
+                  Escribe <strong>ELIMINAR</strong> para confirmar
+                </label>
+                <input
+                  id="confirmar-eliminacion"
+                  type="text"
+                  value={confirmacionEliminacion}
+                  onChange={(event) => setConfirmacionEliminacion(event.target.value)}
+                  autoComplete="off"
+                />
+                <div className="cuenta-privacidad-confirmacion-actions">
+                  <button
+                    type="button"
+                    className="cuenta-privacidad-cancelar"
+                    onClick={() => {
+                      setMostrarEliminacion(false)
+                      setConfirmacionEliminacion('')
+                    }}
+                    disabled={privacidadCargando}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="cuenta-privacidad-confirmar"
+                    onClick={handleSolicitarEliminacion}
+                    disabled={privacidadCargando || confirmacionEliminacion !== 'ELIMINAR'}
+                  >
+                    {privacidadCargando ? 'Enviando...' : 'Eliminar cuenta'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          {error && <div className="login-error" role="alert">{error}</div>}
+          {mensaje && <div className="cuenta-success" role="status">{mensaje}</div>}
+        </section>
 
         <button className="btn-cerrar-sesion-cuenta" onClick={handleCerrarSesion}>
           <LogOut size={16} /> Cerrar sesión

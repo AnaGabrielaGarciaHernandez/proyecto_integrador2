@@ -9,7 +9,7 @@ const roleSchema = z.object({
   role: z.enum(['cliente', 'vendedor', 'admin']),
 });
 
-function createInternalRouter({ db, requireInternalToken }) {
+function createInternalRouter({ db, requireInternalToken, privacyCoordinator = null }) {
   const router = express.Router();
   router.use(requireInternalToken);
 
@@ -139,10 +139,18 @@ function createInternalRouter({ db, requireInternalToken }) {
 
   router.delete('/users/:id', async (req, res, next) => {
     try {
-      const { id } = req.params;
-      const result = await db.query(`DELETE FROM identity.users WHERE id = $1`, [id]);
-      if (result.rowCount === 0) throw createHttpError('User not found', 404);
-      res.json({ ok: true });
+      const params = paramsSchema.safeParse(req.params);
+      if (!params.success) throw createHttpError('User not found', 404);
+      if (!privacyCoordinator) {
+        throw createHttpError('Privacy deletion is not configured', 503, {
+          code: 'PRIVACY_DELETION_UNAVAILABLE',
+        });
+      }
+      const request = await privacyCoordinator.requestDeletion(
+        params.data.id,
+        req.correlationId,
+      );
+      res.status(202).json({ ok: true, request_id: request.id, status: request.status });
     } catch (error) {
       next(error);
     }

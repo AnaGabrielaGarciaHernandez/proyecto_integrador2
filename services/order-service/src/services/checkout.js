@@ -2,11 +2,13 @@ const {
   EVENT_TYPES,
   PaymentCheckoutRequestSchema,
 } = require('@ecobazar/contracts');
+const platform = require('@ecobazar/platform');
 const {
   createEvent,
   createHttpError,
   insertOutbox,
-} = require('@ecobazar/platform');
+} = platform;
+const safeLog = platform.safeLog || (() => {});
 
 function createCheckoutService({ db, orders, cartClient, catalogClient, paymentClient }) {
   async function createCheckout(identity, correlationId) {
@@ -134,7 +136,12 @@ function createCheckoutService({ db, orders, cartClient, catalogClient, paymentC
       // would allow that session to charge an unreserved order. Keep the pending
       // order so an HTTP retry can recover the idempotent session; Stripe expiry
       // remains the final compensation path.
-      console.error(`[order-service] correlation_id=${flowCorrelationId} event_type=checkout.requested step=checkout_state_uncertain order_id=${order.id}`, error);
+      safeLog('error', 'order-service', {
+        correlation_id: flowCorrelationId,
+        event_type: 'checkout.requested',
+        step: 'checkout_state_uncertain',
+        order_id: order.id,
+      }, error);
       throw createHttpError('Checkout state is still being confirmed', 503, {
         code: 'CHECKOUT_IN_PROGRESS', order_id: order.id,
       });
@@ -237,7 +244,12 @@ function createCheckoutService({ db, orders, cartClient, catalogClient, paymentC
          updated_at = now() WHERE order_id = $1 AND status <> 'paid'`,
         [orderId, `${reason}: ${error.message}`],
       );
-      console.error(`[order-service] correlation_id=${correlationId} event_type=${EVENT_TYPES.ORDER_CANCELLED} step=inventory_release_failed order_id=${orderId}`, error);
+      safeLog('error', 'order-service', {
+        correlation_id: correlationId,
+        event_type: EVENT_TYPES.ORDER_CANCELLED,
+        step: 'inventory_release_failed',
+        order_id: orderId,
+      }, error);
       throw error;
     }
 

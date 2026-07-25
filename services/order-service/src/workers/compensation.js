@@ -1,3 +1,5 @@
+const { safeLog } = require('@ecobazar/platform');
+
 function startCompensationWorker({ orders, checkoutService, paymentClient, intervalMs = 5000 }) {
   let running = false;
   let stopped = false;
@@ -17,11 +19,20 @@ function startCompensationWorker({ orders, checkoutService, paymentClient, inter
             reason: saga.last_error || 'Retry pending compensation',
           });
         } catch (error) {
-          console.error(`[order-service] correlation_id=${saga.correlation_id} event_type=order.cancelled.v1 step=compensation_retry_failed order_id=${saga.id}`, error);
+          safeLog('error', 'order-service', {
+            correlation_id: saga.correlation_id,
+            event_type: 'order.cancelled.v1',
+            step: 'compensation_retry_failed',
+            order_id: saga.id,
+          }, error);
         }
       }
     } catch (error) {
-      console.error('[order-service] correlation_id=unknown event_type=order.cancelled.v1 step=compensation_worker_failed', error);
+      safeLog('error', 'order-service', {
+        correlation_id: 'unknown',
+        event_type: 'order.cancelled.v1',
+        step: 'compensation_worker_failed',
+      }, error);
     } finally {
       running = false;
     }
@@ -43,7 +54,12 @@ async function reconcileExpiredCheckouts({ orders, checkoutService, paymentClien
     try {
       await reconcileExpiredCheckout(candidate, { orders, checkoutService, paymentClient });
     } catch (error) {
-      console.error(`[order-service] correlation_id=${candidate.correlation_id} event_type=payment.checkout.expired.v1 step=expired_checkout_compensation_failed order_id=${candidate.id}`, error);
+      safeLog('error', 'order-service', {
+        correlation_id: candidate.correlation_id,
+        event_type: 'payment.checkout.expired.v1',
+        step: 'expired_checkout_compensation_failed',
+        order_id: candidate.id,
+      }, error);
     }
   }
 }
@@ -78,7 +94,12 @@ async function reconcileExpiredCheckout(candidate, { orders, checkoutService, pa
         correlationId,
       );
     } catch (error) {
-      console.error(`[order-service] correlation_id=${correlationId} event_type=payment.checkout.expired.v1 step=expired_checkout_recovery_failed order_id=${candidate.id}`, error);
+      safeLog('error', 'order-service', {
+        correlation_id: correlationId,
+        event_type: 'payment.checkout.expired.v1',
+        step: 'expired_checkout_recovery_failed',
+        order_id: candidate.id,
+      }, error);
       return;
     }
     if (recovered.payment?.status === 'succeeded' || recovered.checkout?.status === 'complete') {
@@ -93,7 +114,12 @@ async function reconcileExpiredCheckout(candidate, { orders, checkoutService, pa
     // idempotent expire command so its local status/outbox are reconciled before
     // Catalog stock is released.
     if (!['open', 'expired'].includes(recovered.checkout?.status)) {
-      console.error(`[order-service] correlation_id=${correlationId} event_type=payment.checkout.expired.v1 step=expired_checkout_recovery_ambiguous order_id=${candidate.id}`);
+      safeLog('error', 'order-service', {
+        correlation_id: correlationId,
+        event_type: 'payment.checkout.expired.v1',
+        step: 'expired_checkout_recovery_ambiguous',
+        order_id: candidate.id,
+      });
       return;
     }
   }
@@ -105,7 +131,12 @@ async function reconcileExpiredCheckout(candidate, { orders, checkoutService, pa
     // Even 404 is ambiguous once Payment creation may have started: Order can
     // hold a session id or Stripe may have accepted a request whose local save
     // was lost. Keep stock reserved and retry instead of risking overselling.
-    console.error(`[order-service] correlation_id=${correlationId} event_type=payment.checkout.expired.v1 step=expired_checkout_reconcile_failed order_id=${candidate.id}`, error);
+    safeLog('error', 'order-service', {
+      correlation_id: correlationId,
+      event_type: 'payment.checkout.expired.v1',
+      step: 'expired_checkout_reconcile_failed',
+      order_id: candidate.id,
+    }, error);
     return;
   }
 
@@ -114,7 +145,12 @@ async function reconcileExpiredCheckout(candidate, { orders, checkoutService, pa
     return;
   }
   if (!isConfirmedWithoutCharge(response)) {
-    console.error(`[order-service] correlation_id=${correlationId} event_type=payment.checkout.expired.v1 step=expired_checkout_ambiguous order_id=${candidate.id}`);
+    safeLog('error', 'order-service', {
+      correlation_id: correlationId,
+      event_type: 'payment.checkout.expired.v1',
+      step: 'expired_checkout_ambiguous',
+      order_id: candidate.id,
+    });
     return;
   }
 

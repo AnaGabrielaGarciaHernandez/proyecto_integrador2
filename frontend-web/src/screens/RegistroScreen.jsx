@@ -221,7 +221,7 @@ export default function RegistroScreen() {
         <p className="registro-terminos">
           Al registrarte aceptas nuestros{' '}
           <a href="#">Términos</a> y{' '}
-          <a href="#">Política de privacidad</a>.
+          <Link to="/privacidad">Política de privacidad</Link>.
         </p>
 
         <button

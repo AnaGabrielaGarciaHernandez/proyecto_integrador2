@@ -20,6 +20,10 @@ const preferencesSchema = z.object({
   show_home_sell_banner: z.boolean(),
 });
 
+const privacyDeletionSchema = z.object({
+  confirmation: z.literal('ELIMINAR'),
+}).strict();
+
 const profileSchema = z.object({
   full_name: z.string().trim().min(2).max(180),
 }).strict();
@@ -28,6 +32,7 @@ module.exports = {
   googleSchema,
   loginSchema,
   preferencesSchema,
+  privacyDeletionSchema,
   profileSchema,
   registerSchema,
 };

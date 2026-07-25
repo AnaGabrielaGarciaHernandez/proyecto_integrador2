@@ -177,7 +177,10 @@ export default function HomeScreen() {
   const productosVistos = productos.slice(6, 12)
   const mostrarBannerVender = (
     !authLoading
-    && (!user || user.preferences?.show_home_sell_banner === true)
+    && (!user || (
+      user.role === 'cliente'
+      && user.preferences?.show_home_sell_banner === true
+    ))
   )
   const currentBannerError = bannerError && bannerError.accountId === user?.id
     ? bannerError.message

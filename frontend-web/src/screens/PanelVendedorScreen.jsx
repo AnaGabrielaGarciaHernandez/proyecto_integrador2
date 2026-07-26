@@ -166,6 +166,18 @@ export default function PanelVendedorScreen() {
     return () => { mounted = false }
   }, [authLoading, user])
 
+  useEffect(() => {
+    if (!selectedProduct) return undefined
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') {
+        setSelectedProduct(null)
+        setEditForm(null)
+      }
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [selectedProduct])
+
   const activeProduct = useMemo(
     () => products.find((product) => product.id === selectedProduct?.id) || selectedProduct,
     [products, selectedProduct],
@@ -428,9 +440,23 @@ export default function PanelVendedorScreen() {
         </section>
 
         {activeProduct && editForm && (
-          <section className="seller-section seller-editor" aria-label="Editar publicación">
-            <div className="seller-section-header"><div><h2>Editar publicación</h2><p>Los cambios se guardan en el backend antes de cerrar este editor.</p></div><button className="seller-close" onClick={closeEditor} aria-label="Cerrar editor"><X size={18} /></button></div>
-            <form className="seller-edit-form" onSubmit={saveProduct}>
+          <div
+            className="seller-edit-modal-backdrop"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) closeEditor()
+            }}
+          >
+            <section
+              className="seller-section seller-editor seller-edit-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="seller-edit-modal-title"
+            >
+              <button type="button" className="seller-edit-modal-close" onClick={closeEditor} aria-label="Cerrar editor">
+                <X size={20} />
+              </button>
+              <div className="seller-section-header"><div><h2 id="seller-edit-modal-title">Editar publicación</h2><p>Los cambios se guardan en el backend antes de cerrar este editor.</p></div></div>
+              <form className="seller-edit-form" onSubmit={saveProduct}>
               <label>Nombre<input value={editForm.name} onChange={(event) => setFormField('name', event.target.value)} maxLength={180} disabled={Boolean(busy)} required /></label>
               <label>Descripción<textarea value={editForm.description} onChange={(event) => setFormField('description', event.target.value)} maxLength={5000} disabled={Boolean(busy)} required /></label>
               <label>Condición<select value={editForm.condition} onChange={(event) => setFormField('condition', event.target.value)} disabled={Boolean(busy)}>{CONDITIONS.map((condition) => <option key={condition} value={condition}>{condition}</option>)}</select></label>
@@ -440,10 +466,11 @@ export default function PanelVendedorScreen() {
               <div className="edit-pickup-schedules"><div className="edit-label-row"><span>Horarios de recogida</span><button type="button" onClick={addEditSchedule} disabled={Boolean(busy)}><Plus size={14} /> Agregar</button></div>{editForm.pickup_schedules.map((schedule, index) => <div className="edit-pickup-schedule-row" key={`${index}-${schedule.day_of_week}-${schedule.start_time}`}><select aria-label={`Día del horario de edición ${index + 1}`} value={schedule.day_of_week} onChange={(event) => updateEditSchedule(index, 'day_of_week', event.target.value)} disabled={Boolean(busy)}>{WEEK_DAYS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}</select><input type="time" value={schedule.start_time} onChange={(event) => updateEditSchedule(index, 'start_time', event.target.value)} disabled={Boolean(busy)} required /><input type="time" value={schedule.end_time} onChange={(event) => updateEditSchedule(index, 'end_time', event.target.value)} disabled={Boolean(busy)} required /><button type="button" onClick={() => removeEditSchedule(index)} disabled={Boolean(busy)} aria-label="Eliminar horario"><Trash2 size={15} /></button></div>)}</div>
               <div className="edit-variants"><div className="edit-label-row"><span>Variantes y stock</span><button type="button" onClick={addEditVariant} disabled={Boolean(busy)}><Plus size={14} /> Agregar</button></div>{editForm.variants.map((variant, index) => <div className="edit-variant-row" key={variant.id || `new-${index}`}><input value={variant.size_name} onChange={(event) => updateEditVariant(index, 'size_name', event.target.value)} placeholder="Talla" disabled={Boolean(busy)} required /><input type="number" min="0" value={variant.stock} onChange={(event) => updateEditVariant(index, 'stock', event.target.value)} placeholder="Stock" disabled={Boolean(busy)} required /><button type="button" onClick={() => removeEditVariant(index)} disabled={Boolean(busy) || editForm.variants.length <= 1} aria-label="Eliminar variante"><Trash2 size={15} /></button></div>)}</div>
               <button className="panel-save-button" type="submit" disabled={Boolean(busy)}>{busy === `edit-${activeProduct.id}` ? 'Guardando...' : <><Check size={16} /> Guardar cambios</>}</button>
-            </form>
+              </form>
 
-            <div className="seller-image-manager"><div className="edit-label-row"><div><h3>Imágenes</h3><p>La estrella indica la portada. Puedes reordenar y retirar imágenes.</p></div><button type="button" onClick={() => imageInputRef.current?.click()} disabled={Boolean(busy) || activeProduct.status === 'removed'}><ImagePlus size={15} /> Agregar imágenes</button><input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={addImages} /></div><div className="managed-images">{(activeProduct.images || []).map((image, index) => <div className={`managed-image ${image.is_cover ? 'is-cover' : ''}`} key={image.id}><img src={image.url} alt={`Imagen ${index + 1} de ${activeProduct.name}`} /><div className="managed-image-actions"><button type="button" onClick={() => handleImageOrder(activeProduct, index, -1)} disabled={Boolean(busy) || index === 0} aria-label="Subir imagen"><ArrowUp size={14} /></button><button type="button" onClick={() => handleImageOrder(activeProduct, index, 1)} disabled={Boolean(busy) || index === (activeProduct.images || []).length - 1} aria-label="Bajar imagen"><ArrowDown size={14} /></button><button type="button" onClick={() => handleCover(activeProduct, image)} disabled={Boolean(busy) || image.is_cover} aria-label="Elegir portada"><StarIcon active={image.is_cover} /></button><button type="button" onClick={() => handleImageDelete(activeProduct, image)} disabled={Boolean(busy) || (activeProduct.images || []).length <= 1} aria-label="Eliminar imagen"><Trash2 size={14} /></button></div></div>)}</div></div>
-          </section>
+              <div className="seller-image-manager"><div className="edit-label-row"><div><h3>Imágenes</h3><p>La estrella indica la portada. Puedes reordenar y retirar imágenes.</p></div><button type="button" onClick={() => imageInputRef.current?.click()} disabled={Boolean(busy) || activeProduct.status === 'removed'}><ImagePlus size={15} /> Agregar imágenes</button><input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={addImages} /></div><div className="managed-images">{(activeProduct.images || []).map((image, index) => <div className={`managed-image ${image.is_cover ? 'is-cover' : ''}`} key={image.id}><img src={image.url} alt={`Imagen ${index + 1} de ${activeProduct.name}`} /><div className="managed-image-actions"><button type="button" onClick={() => handleImageOrder(activeProduct, index, -1)} disabled={Boolean(busy) || index === 0} aria-label="Subir imagen"><ArrowUp size={14} /></button><button type="button" onClick={() => handleImageOrder(activeProduct, index, 1)} disabled={Boolean(busy) || index === (activeProduct.images || []).length - 1} aria-label="Bajar imagen"><ArrowDown size={14} /></button><button type="button" onClick={() => handleCover(activeProduct, image)} disabled={Boolean(busy) || image.is_cover} aria-label="Elegir portada"><StarIcon active={image.is_cover} /></button><button type="button" onClick={() => handleImageDelete(activeProduct, image)} disabled={Boolean(busy) || (activeProduct.images || []).length <= 1} aria-label="Eliminar imagen"><Trash2 size={14} /></button></div></div>)}</div></div>
+            </section>
+          </div>
         )}
 
         <section className="seller-section seller-history-section">

@@ -80,6 +80,51 @@ test('cart changes cancel the server checkout before mutating cart state', async
   assert.notEqual(requests.at(-1).path, '/api/cart/items')
 })
 
+test('paid checkout refreshes the cart after the asynchronous order event removes purchased items', async (t) => {
+  const originalFetch = globalThis.fetch
+  const originalWindow = globalThis.window
+  let cartRequests = 0
+  let updateEvents = 0
+
+  globalThis.window = {
+    dispatchEvent(event) {
+      if (event.type === 'carritoActualizado') updateEvents += 1
+    },
+  }
+  globalThis.fetch = async (url) => {
+    const path = new URL(url).pathname
+    if (path !== '/api/cart') return jsonResponse(404, { error: { message: 'Not found' } })
+    cartRequests += 1
+    return jsonResponse(200, {
+      cart: {
+        id: '33333333-3333-4333-8333-333333333333',
+        items: cartRequests === 1
+          ? [{ id: 'cart-item', variant_id: VARIANT_ID, quantity: 1, unit_price_cents: 1000 }]
+          : [],
+      },
+    })
+  }
+
+  const vite = await createServer({
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  })
+  t.after(async () => {
+    await vite.close()
+    globalThis.fetch = originalFetch
+    globalThis.window = originalWindow
+  })
+
+  const cartService = await vite.ssrLoadModule('/src/services/carrito.js')
+  const cart = await cartService.sincronizarCarritoDespuesDePago([{ variant_id: VARIANT_ID }])
+
+  assert.equal(cart.items.length, 0)
+  assert.equal(cartRequests, 2)
+  assert.equal(updateEvents, 1)
+})
+
 function jsonResponse(status, body) {
   return new Response(JSON.stringify(body), {
     status,

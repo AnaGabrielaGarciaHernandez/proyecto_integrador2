@@ -28,3 +28,12 @@ test('publication and order screens carry pickup configuration without exposing 
   assert.match(orders, /pickup_groups/)
   assert.match(orders, /America\/Monterrey/)
 });
+
+test('payment confirmation hides identifiers and refreshes the cart after the paid event', () => {
+  const checkout = read('screens/CheckoutStatusScreen.jsx')
+  const cart = read('services/carrito.js')
+  assert.match(checkout, /Tu pedido quedó registrado\. Te avisaremos cuando esté listo para recoger\./)
+  assert.doesNotMatch(checkout, /order\.order_number/)
+  assert.match(checkout, /sincronizarCarritoDespuesDePago\(nextOrder\.items\)/)
+  assert.match(cart, /export async function sincronizarCarritoDespuesDePago/)
+});

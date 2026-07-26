@@ -2,6 +2,9 @@ import { del, get, patch, post } from './api'
 import { cancelarCheckoutActivo } from './checkout'
 import { centsToPesos } from './products'
 
+const PAYMENT_CART_SYNC_ATTEMPTS = 12
+const PAYMENT_CART_SYNC_DELAY_MS = 500
+
 export async function getCarrito() {
   const data = await get('/cart')
   return mapCart(data.cart, data.adjustments)
@@ -42,6 +45,34 @@ export async function cambiarCantidad(id, quantity) {
 export async function contarItems() {
   const cart = await getCarrito()
   return cart.items.reduce((total, item) => total + item.cantidad, 0)
+}
+
+export async function sincronizarCarritoDespuesDePago(items = []) {
+  const paidVariantIds = new Set(
+    (Array.isArray(items) ? items : []).map((item) => item?.variant_id).filter(Boolean),
+  )
+  let latestCart = null
+
+  for (let attempt = 0; attempt < PAYMENT_CART_SYNC_ATTEMPTS; attempt += 1) {
+    try {
+      latestCart = await getCarrito()
+      const purchasedItemsRemain = paidVariantIds.size > 0
+        && latestCart.items.some((item) => paidVariantIds.has(item.variantId))
+      if (!purchasedItemsRemain) {
+        notifyCartUpdated()
+        return latestCart
+      }
+    } catch {
+      // The order event may still be propagating through the backend.
+    }
+
+    if (attempt < PAYMENT_CART_SYNC_ATTEMPTS - 1) {
+      await new Promise((resolve) => setTimeout(resolve, PAYMENT_CART_SYNC_DELAY_MS))
+    }
+  }
+
+  if (latestCart) notifyCartUpdated()
+  return latestCart
 }
 
 function mapCart(cart, adjustments = []) {

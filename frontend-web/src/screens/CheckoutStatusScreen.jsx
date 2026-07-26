@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { CheckCircle2, Clock3, XCircle } from 'lucide-react'
 import { cancelarCheckout } from '../services/checkout'
+import { sincronizarCarritoDespuesDePago } from '../services/carrito'
 import { getOrder } from '../services/orders'
 import { useWishlist } from '../context/useWishlist'
 import '../styles/CheckoutStatusScreen.css'
@@ -33,6 +34,7 @@ export function CheckoutSuccessScreen() {
         if (nextOrder.status === 'paid' || nextOrder.status !== 'pending_payment') {
           if (nextOrder.status === 'paid') {
             window.dispatchEvent(new Event('carritoActualizado'))
+            void sincronizarCarritoDespuesDePago(nextOrder.items)
             hidePurchased((nextOrder.items || []).map((item) => item.product_id))
           }
           setFinishedPolling(true)
@@ -61,7 +63,7 @@ export function CheckoutSuccessScreen() {
         <h1>{paid ? 'Pago confirmado' : 'Confirmando tu pago'}</h1>
         <p>
           {paid
-            ? `Tu pedido ${order.order_number} quedó registrado. Te avisaremos cuando esté listo para recoger.`
+            ? 'Tu pedido quedó registrado. Te avisaremos cuando esté listo para recoger.'
             : finishedPolling
               ? 'La confirmación está tardando un poco. Tu pedido se actualizará automáticamente cuando Stripe confirme el pago.'
               : 'Recibimos tu regreso de Stripe. Estamos esperando la confirmación segura del pago.'}

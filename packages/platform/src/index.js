@@ -3,4 +3,6 @@ module.exports = {
   ...require('./http'),
   ...require('./events'),
   ...require('./rate-limit'),
+  ...require('./config'),
+  ...require('./metrics'),
 };

@@ -35,9 +35,25 @@ const profileSchema = z.object({
   full_name: z.string().trim().min(2).max(50),
 }).strict();
 
+const emailTokenSchema = z.object({
+  token: z.string().trim().min(40).max(128),
+}).strict();
+
+const emailRequestSchema = z.object({
+  email: z.string().email().trim().toLowerCase(),
+}).strict();
+
+const passwordResetSchema = z.object({
+  token: z.string().trim().min(40).max(128),
+  password: registrationPasswordSchema,
+}).strict();
+
 module.exports = {
   googleSchema,
+  emailRequestSchema,
+  emailTokenSchema,
   loginSchema,
+  passwordResetSchema,
   preferencesSchema,
   privacyDeletionSchema,
   profileSchema,

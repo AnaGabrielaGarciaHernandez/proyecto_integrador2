@@ -1,6 +1,7 @@
 const path = require('node:path');
 const dotenv = require('dotenv');
 const { z } = require('zod');
+const { assertNotDevelopmentDefault, assertProductionConfig } = require('@ecobazar/platform');
 
 dotenv.config({ path: path.join(__dirname, '..', '.env'), quiet: true });
 
@@ -29,7 +30,13 @@ const EnvSchema = z.object({
 });
 
 function loadConfig(source = process.env) {
-  return EnvSchema.parse(source);
+  const config = EnvSchema.parse(source);
+  assertNotDevelopmentDefault(config, ['INTERNAL_SERVICE_TOKEN', 'RATE_LIMIT_HASH_KEY', 'RABBITMQ_URL']);
+  if (config.NODE_ENV === 'production' && (!config.SUPABASE_URL || !config.SUPABASE_SERVER_KEY)) {
+    throw new Error('SUPABASE_URL and SUPABASE_SERVER_KEY are required in production');
+  }
+  assertProductionConfig(config, { httpsUrls: ['SUPABASE_URL'] });
+  return config;
 }
 
 module.exports = { loadConfig };

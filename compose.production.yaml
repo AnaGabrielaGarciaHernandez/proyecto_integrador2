@@ -1,0 +1,173 @@
+name: ecobazar
+
+services:
+  postgres:
+    ports: !reset []
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?IDENTITY_DB_PASSWORD is required}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?CATALOG_DB_PASSWORD is required}
+      CART_DB_PASSWORD: ${CART_DB_PASSWORD:?CART_DB_PASSWORD is required}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:?ORDER_DB_PASSWORD is required}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:?PAYMENT_DB_PASSWORD is required}
+      MODERATION_DB_PASSWORD: ${MODERATION_DB_PASSWORD:?MODERATION_DB_PASSWORD is required}
+
+  rabbitmq:
+    ports: !reset []
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?RABBITMQ_DEFAULT_USER is required}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?RABBITMQ_DEFAULT_PASS is required}
+
+  migrate:
+    environment:
+      NODE_ENV: production
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      IDENTITY_DATABASE_URL: ${IDENTITY_DATABASE_URL:?IDENTITY_DATABASE_URL is required}
+      CATALOG_DATABASE_URL: ${CATALOG_DATABASE_URL:?CATALOG_DATABASE_URL is required}
+      CART_DATABASE_URL: ${CART_DATABASE_URL:?CART_DATABASE_URL is required}
+      ORDER_DATABASE_URL: ${ORDER_DATABASE_URL:?ORDER_DATABASE_URL is required}
+      PAYMENT_DATABASE_URL: ${PAYMENT_DATABASE_URL:?PAYMENT_DATABASE_URL is required}
+      MODERATION_DATABASE_URL: ${MODERATION_DATABASE_URL:?MODERATION_DATABASE_URL is required}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      RATE_LIMIT_HASH_KEY: ${RATE_LIMIT_HASH_KEY:?RATE_LIMIT_HASH_KEY is required}
+      PUBLIC_APP_URL: https://${APP_DOMAIN:?APP_DOMAIN is required}
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:?SMTP_FROM is required}
+      SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
+      SUPABASE_SERVER_KEY: ${SUPABASE_SERVER_KEY:?SUPABASE_SERVER_KEY is required}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?STRIPE_SECRET_KEY is required}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?STRIPE_WEBHOOK_SECRET is required}
+      CLIENT_ORIGIN: https://${APP_DOMAIN:?APP_DOMAIN is required}
+
+  jwt-keys:
+    environment:
+      NODE_ENV: production
+      JWT_KEYS_DIR: /run/secrets
+    volumes: !reset
+      - ./.secrets:/run/secrets:ro
+
+  identity-service:
+    ports: !reset []
+    environment:
+      NODE_ENV: production
+      CLIENT_ORIGIN: https://${APP_DOMAIN:?APP_DOMAIN is required}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      RATE_LIMIT_HASH_KEY: ${RATE_LIMIT_HASH_KEY:?RATE_LIMIT_HASH_KEY is required}
+      DATABASE_URL: ${IDENTITY_DATABASE_URL:?IDENTITY_DATABASE_URL is required}
+      PUBLIC_APP_URL: https://${APP_DOMAIN:?APP_DOMAIN is required}
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:?SMTP_FROM is required}
+      SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
+      SUPABASE_SERVER_KEY: ${SUPABASE_SERVER_KEY:?SUPABASE_SERVER_KEY is required}
+      JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-private.pem
+    volumes: !reset
+      - ./.secrets:/run/secrets:ro
+
+  catalog-service:
+    ports: !reset []
+    environment:
+      NODE_ENV: production
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      RATE_LIMIT_HASH_KEY: ${RATE_LIMIT_HASH_KEY:?RATE_LIMIT_HASH_KEY is required}
+      DATABASE_URL: ${CATALOG_DATABASE_URL:?CATALOG_DATABASE_URL is required}
+      SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
+      SUPABASE_SERVER_KEY: ${SUPABASE_SERVER_KEY:?SUPABASE_SERVER_KEY is required}
+
+  cart-service:
+    ports: !reset []
+    environment:
+      NODE_ENV: production
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      RATE_LIMIT_HASH_KEY: ${RATE_LIMIT_HASH_KEY:?RATE_LIMIT_HASH_KEY is required}
+      DATABASE_URL: ${CART_DATABASE_URL:?CART_DATABASE_URL is required}
+
+  order-service:
+    ports: !reset []
+    environment:
+      NODE_ENV: production
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      RATE_LIMIT_HASH_KEY: ${RATE_LIMIT_HASH_KEY:?RATE_LIMIT_HASH_KEY is required}
+      DATABASE_URL: ${ORDER_DATABASE_URL:?ORDER_DATABASE_URL is required}
+
+  payment-service:
+    ports: !reset []
+    environment:
+      NODE_ENV: production
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      RATE_LIMIT_HASH_KEY: ${RATE_LIMIT_HASH_KEY:?RATE_LIMIT_HASH_KEY is required}
+      DATABASE_URL: ${PAYMENT_DATABASE_URL:?PAYMENT_DATABASE_URL is required}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?STRIPE_SECRET_KEY is required}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?STRIPE_WEBHOOK_SECRET is required}
+      CLIENT_ORIGIN: https://${APP_DOMAIN:?APP_DOMAIN is required}
+
+  moderation-service:
+    ports: !reset []
+    environment:
+      NODE_ENV: production
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      RATE_LIMIT_HASH_KEY: ${RATE_LIMIT_HASH_KEY:?RATE_LIMIT_HASH_KEY is required}
+      DATABASE_URL: ${MODERATION_DATABASE_URL:?MODERATION_DATABASE_URL is required}
+
+  api-gateway:
+    ports: !reset []
+    environment:
+      NODE_ENV: production
+      CLIENT_ORIGIN: https://${APP_DOMAIN:?APP_DOMAIN is required}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      RATE_LIMIT_HASH_KEY: ${RATE_LIMIT_HASH_KEY:?RATE_LIMIT_HASH_KEY is required}
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
+    volumes: !reset
+      - ./.secrets:/run/secrets:ro
+
+  frontend-web:
+    build:
+      dockerfile: frontend-web/Dockerfile.production
+      args:
+        VITE_API_URL: /api
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        VITE_LEGAL_COMPANY_NAME: ${LEGAL_COMPANY_NAME:?LEGAL_COMPANY_NAME is required}
+        VITE_LEGAL_ADDRESS: ${LEGAL_ADDRESS:?LEGAL_ADDRESS is required}
+        VITE_PRIVACY_EMAIL: ${PRIVACY_EMAIL:?PRIVACY_EMAIL is required}
+        VITE_SUPPORT_EMAIL: ${SUPPORT_EMAIL:?SUPPORT_EMAIL is required}
+        VITE_SUPPORT_PHONE: ${SUPPORT_PHONE:-}
+    ports: !reset []
+    environment: !reset {}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN is required}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/production/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      frontend-web:
+        condition: service_healthy
+    networks: [ecobazar-internal]
+
+volumes:
+  caddy-data:
+  caddy-config:

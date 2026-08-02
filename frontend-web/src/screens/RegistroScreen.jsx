@@ -56,6 +56,7 @@ export default function RegistroScreen() {
   const [avatarCargando, setAvatarCargando] = useState(false)
   const [toast, setToast] = useState(false)
   const [error, setError] = useState('')
+  const [registroPendiente, setRegistroPendiente] = useState(null)
   const [cargando, setCargando] = useState(false)
   const [registroIntentado, setRegistroIntentado] = useState(false)
   const [camposTocados, setCamposTocados] = useState({
@@ -123,12 +124,16 @@ export default function RegistroScreen() {
     try {
       setCargando(true)
       setError('')
-      await register({
+      const result = await register({
         full_name: nombre.trim(),
         email: correo.trim(),
         password: contrasena,
       })
-      setMostrarAvatarModal(true)
+      if (result?.verification_required) {
+        setRegistroPendiente(result.email || correo.trim())
+      } else {
+        setMostrarAvatarModal(true)
+      }
     } catch (err) {
       setError(err.message || 'No se pudo crear la cuenta.')
     } finally {
@@ -230,6 +235,16 @@ export default function RegistroScreen() {
 
         {error && <div className="login-error" role="alert">{error}</div>}
 
+        {registroPendiente && (
+          <div className="registro-verificacion" role="status">
+            <strong>Revisa tu correo para activar tu cuenta.</strong>
+            <p>
+              Enviamos un enlace a <b>{registroPendiente}</b>. Después de confirmarlo podrás iniciar sesión.
+            </p>
+            <Link to="/login">Ir a iniciar sesión</Link>
+          </div>
+        )}
+
         <div className="login-campos">
           <div className="registro-campo">
             <div className="input-wrapper">
@@ -311,7 +326,7 @@ export default function RegistroScreen() {
 
         <p className="registro-terminos">
           Al registrarte aceptas nuestros{' '}
-          <a href="#">Términos</a> y{' '}
+          <Link to="/terminos">Términos</Link> y{' '}
           <Link to="/privacidad">Política de privacidad</Link>.
         </p>
 
@@ -319,9 +334,9 @@ export default function RegistroScreen() {
           className="btn-login-principal"
           type="button"
           onClick={handleRegistrar}
-          disabled={cargando}
+          disabled={cargando || Boolean(registroPendiente)}
         >
-          {cargando ? 'Creando cuenta...' : 'Crear cuenta'} <ChevronRight size={16} />
+          {cargando ? 'Creando cuenta...' : registroPendiente ? 'Correo pendiente' : 'Crear cuenta'} <ChevronRight size={16} />
         </button>
 
         <p className="registro-login">

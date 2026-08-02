@@ -8,7 +8,9 @@ const {
   createPostgresRateLimiter,
   createRateLimitMiddleware,
   insertOutbox,
+  safeLog,
 } = require('@ecobazar/platform');
+const { createEmailService } = require('../services/email');
 const {
   clearSessionCookie,
   createSessionToken,
@@ -24,6 +26,9 @@ const {
   profileSchema,
   privacyDeletionSchema,
   registerSchema,
+  emailRequestSchema,
+  emailTokenSchema,
+  passwordResetSchema,
 } = require('../services/validation');
 const {
   AVATAR_ALLOWED_MIME_TYPES,
@@ -33,7 +38,8 @@ const { PRIVACY_CONFIRMATION } = require('../services/privacy');
 
 const userColumns = `
   id, email, full_name, password_hash, auth_provider, role,
-  phone, bio, avatar_url, is_active, created_at, show_home_sell_banner
+  phone, bio, avatar_url, is_active, created_at, show_home_sell_banner,
+  email_verified_at
 `;
 
 function createAuthRouter({
@@ -45,6 +51,7 @@ function createAuthRouter({
   requireAuth,
   avatarStorage = null,
   privacyCoordinator = null,
+  emailService = null,
   avatarProcessor,
   avatarRateLimiter,
 } = {}) {
@@ -56,6 +63,7 @@ function createAuthRouter({
     expiresIn: config.JWT_EXPIRES_IN,
   };
   const processAvatar = avatarProcessor || createAvatarProcessor(config);
+  const resolvedEmailService = emailService || createEmailService(config);
   const rateLimiter = avatarRateLimiter || createPostgresRateLimiter({
     db,
     scope: 'identity:avatar',
@@ -86,6 +94,13 @@ function createAuthRouter({
     scope: 'identity:register',
     maxAttempts: config.REGISTER_RATE_LIMIT_MAX || 10,
     windowMs: config.REGISTER_RATE_LIMIT_WINDOW_MS || 60 * 60 * 1000,
+    hashSecret: config.RATE_LIMIT_HASH_KEY,
+  });
+  const emailRateLimiter = createPostgresRateLimiter({
+    db,
+    scope: 'identity:email',
+    maxAttempts: config.EMAIL_RATE_LIMIT_MAX || 5,
+    windowMs: config.EMAIL_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000,
     hashSecret: config.RATE_LIMIT_HASH_KEY,
   });
   const googleRateLimiter = createPostgresRateLimiter({
@@ -123,6 +138,11 @@ function createAuthRouter({
     keyResolver: (req) => getClientIp(req),
     message: 'Demasiados registros desde esta conexión. Inténtalo más tarde.',
   });
+  const rateLimitEmail = createRateLimitMiddleware({
+    limiter: emailRateLimiter,
+    keyResolver: (req) => `${getClientIp(req)}:${String(req.body?.email || '').trim().toLowerCase() || 'unknown'}`,
+    message: 'Demasiadas solicitudes. Inténtalo más tarde.',
+  });
   const rateLimitGoogle = createRateLimitMiddleware({
     limiter: googleRateLimiter,
     keyResolver: (req) => getClientIp(req),
@@ -138,35 +158,209 @@ function createAuthRouter({
     keyResolver: (req) => req.user.id,
     message: 'Has alcanzado el límite temporal de solicitudes de eliminación.',
   });
+  const issueEmailToken = async ({ type, email, ttlMs }) => db.transaction(async (client) => {
+    const result = await client.query(
+      `SELECT id, email, email_verified_at
+       FROM identity.users
+       WHERE lower(email) = lower($1)
+         AND is_active = true
+         AND auth_provider = 'email'
+       FOR UPDATE`,
+      [email],
+    );
+    const user = result.rows[0];
+    if (!user || (type === 'verification' && user.email_verified_at)) return null;
+
+    const token = resolvedEmailService.createToken();
+    await createEmailToken(client, {
+      userId: user.id,
+      tokenHash: resolvedEmailService.hashToken(token),
+      tokenType: type,
+      ttlMs,
+    });
+    return { user, token };
+  });
+  const deliverEmail = async (send) => {
+    try {
+      await send();
+    } catch (error) {
+      safeLog('error', 'identity-service', { step: 'email_delivery_failed' }, error);
+    }
+  };
 
   router.post('/register', rateLimitRegister, async (req, res, next) => {
     try {
       const input = parseBody(registerSchema, req.body);
       const passwordHash = await bcrypt.hash(input.password, 12);
+      const verificationToken = resolvedEmailService.createToken();
+      const verificationHash = resolvedEmailService.hashToken(verificationToken);
 
       const created = await db.transaction(async (client) => {
         const result = await client.query(
           `INSERT INTO identity.users
              (email, full_name, password_hash, auth_provider, phone, avatar_url, email_verified_at)
-           VALUES ($1, $2, $3, 'email', $4, $5, now())
+           VALUES ($1, $2, $3, 'email', $4, $5, NULL)
            RETURNING ${userColumns}`,
           [input.email, input.full_name, passwordHash, input.phone || null, null],
         );
         const user = result.rows[0];
-        const session = await createSession(client, user, tokenOptions);
+        await createEmailToken(client, {
+          userId: user.id,
+          tokenHash: verificationHash,
+          tokenType: 'verification',
+          ttlMs: config.EMAIL_VERIFICATION_TTL_MS,
+        });
         await enqueueUserRegistered(client, user, req.correlationId);
-        return { user, session };
+        return { user };
       });
 
-      setSessionCookie(
-        res,
-        config.COOKIE_NAME,
-        created.session.token,
-        config.NODE_ENV,
-      );
-      res.status(201).json({ user: serializeUser(created.user) });
+      await deliverEmail(() => resolvedEmailService.sendVerificationEmail({
+        to: created.user.email,
+        token: verificationToken,
+      }));
+      res.status(202).json({
+        verification_required: true,
+        email: created.user.email,
+      });
     } catch (error) {
       next(normalizeUniqueEmailError(error));
+    }
+  });
+
+  router.post('/verify-email', async (req, res, next) => {
+    try {
+      const input = parseBody(emailTokenSchema, req.body);
+      await db.transaction(async (client) => {
+        const result = await client.query(
+          `SELECT t.id, t.user_id
+           FROM identity.email_tokens t
+           JOIN identity.users u ON u.id = t.user_id
+           WHERE t.token_hash = $1
+             AND t.token_type = 'verification'
+             AND t.used_at IS NULL
+             AND t.expires_at > now()
+             AND u.is_active = true
+           FOR UPDATE OF t`,
+          [resolvedEmailService.hashToken(input.token)],
+        );
+        const token = result.rows[0];
+        if (!token) {
+          throw createHttpError('Invalid or expired email verification token', 400, {
+            code: 'EMAIL_TOKEN_INVALID',
+          });
+        }
+        await client.query(
+          'UPDATE identity.email_tokens SET used_at = now() WHERE id = $1',
+          [token.id],
+        );
+        await client.query(
+          `UPDATE identity.users
+           SET email_verified_at = COALESCE(email_verified_at, now())
+           WHERE id = $1`,
+          [token.user_id],
+        );
+        await client.query(
+          `UPDATE identity.email_tokens
+           SET used_at = COALESCE(used_at, now())
+           WHERE user_id = $1 AND token_type = 'verification' AND id <> $2`,
+          [token.user_id, token.id],
+        );
+      });
+      res.json({ verified: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/resend-verification', rateLimitEmail, async (req, res, next) => {
+    try {
+      const input = parseBody(emailRequestSchema, req.body);
+      const issued = await issueEmailToken({
+        type: 'verification',
+        email: input.email,
+        ttlMs: config.EMAIL_VERIFICATION_TTL_MS,
+      });
+      if (issued) {
+        await deliverEmail(() => resolvedEmailService.sendVerificationEmail({
+          to: issued.user.email,
+          token: issued.token,
+        }));
+      }
+      res.status(202).json({ message: 'Si la cuenta existe, recibirás un correo con instrucciones.' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/forgot-password', rateLimitEmail, async (req, res, next) => {
+    try {
+      const input = parseBody(emailRequestSchema, req.body);
+      const issued = await issueEmailToken({
+        type: 'password_reset',
+        email: input.email,
+        ttlMs: config.PASSWORD_RESET_TTL_MS,
+      });
+      if (issued) {
+        await deliverEmail(() => resolvedEmailService.sendPasswordResetEmail({
+          to: issued.user.email,
+          token: issued.token,
+        }));
+      }
+      res.status(202).json({ message: 'Si la cuenta existe, recibirás un correo con instrucciones.' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/reset-password', rateLimitEmail, async (req, res, next) => {
+    try {
+      const input = parseBody(passwordResetSchema, req.body);
+      const passwordHash = await bcrypt.hash(input.password, 12);
+      await db.transaction(async (client) => {
+        const result = await client.query(
+          `SELECT t.id, t.user_id
+           FROM identity.email_tokens t
+           JOIN identity.users u ON u.id = t.user_id
+           WHERE t.token_hash = $1
+             AND t.token_type = 'password_reset'
+             AND t.used_at IS NULL
+             AND t.expires_at > now()
+             AND u.is_active = true
+             AND u.auth_provider = 'email'
+           FOR UPDATE OF t`,
+          [resolvedEmailService.hashToken(input.token)],
+        );
+        const token = result.rows[0];
+        if (!token) {
+          throw createHttpError('Invalid or expired password reset token', 400, {
+            code: 'PASSWORD_RESET_TOKEN_INVALID',
+          });
+        }
+        await client.query(
+          'UPDATE identity.users SET password_hash = $2 WHERE id = $1',
+          [token.user_id, passwordHash],
+        );
+        await client.query(
+          `UPDATE identity.sessions
+           SET revoked_at = COALESCE(revoked_at, now())
+           WHERE user_id = $1`,
+          [token.user_id],
+        );
+        await client.query(
+          'UPDATE identity.email_tokens SET used_at = now() WHERE id = $1',
+          [token.id],
+        );
+        await client.query(
+          `UPDATE identity.email_tokens
+           SET used_at = COALESCE(used_at, now())
+           WHERE user_id = $1 AND token_type = 'password_reset' AND id <> $2`,
+          [token.user_id, token.id],
+        );
+      });
+      clearSessionCookie(res, config.COOKIE_NAME, config.NODE_ENV);
+      res.json({ password_reset: true });
+    } catch (error) {
+      next(error);
     }
   });
 
@@ -185,6 +379,11 @@ function createAuthRouter({
         : false;
       if (!user || !passwordMatches) {
         throw createHttpError('Invalid email or password', 401);
+      }
+      if (!user.email_verified_at) {
+        throw createHttpError('Email verification required', 403, {
+          code: 'EMAIL_NOT_VERIFIED',
+        });
       }
 
       const session = await db.transaction(async (client) => {
@@ -296,6 +495,11 @@ function createAuthRouter({
       const payload = ticket.getPayload();
       if (!payload?.email || !payload.sub) {
         throw createHttpError('Invalid Google token payload', 401);
+      }
+      if (!payload.email_verified) {
+        throw createHttpError('Google email is not verified', 403, {
+          code: 'GOOGLE_EMAIL_NOT_VERIFIED',
+        });
       }
 
       const authenticated = await db.transaction(async (client) => {
@@ -550,10 +754,12 @@ function getClientIp(req) {
 async function findOrCreateGoogleUser(client, payload) {
   const existingBySub = await client.query(
     `UPDATE identity.users
-     SET last_login_at = now()
+     SET google_email_verified = $2,
+         email_verified_at = COALESCE(email_verified_at, $3),
+         last_login_at = now()
      WHERE google_sub = $1 AND is_active = true
      RETURNING ${userColumns}`,
-    [payload.sub],
+    [payload.sub, Boolean(payload.email_verified), payload.email_verified ? new Date() : null],
   );
   if (existingBySub.rows[0]) return { user: existingBySub.rows[0], isNew: false };
 
@@ -600,6 +806,22 @@ async function findOrCreateGoogleUser(client, payload) {
     ],
   );
   return { user: inserted.rows[0], isNew: true };
+}
+
+async function createEmailToken(client, { userId, tokenHash, tokenType, ttlMs }) {
+  await client.query(
+    `UPDATE identity.email_tokens
+     SET used_at = COALESCE(used_at, now())
+     WHERE user_id = $1 AND token_type = $2 AND used_at IS NULL`,
+    [userId, tokenType],
+  );
+  const result = await client.query(
+    `INSERT INTO identity.email_tokens (user_id, token_hash, token_type, expires_at)
+     VALUES ($1, $2, $3, now() + ($4 * interval '1 millisecond'))
+     RETURNING id, expires_at`,
+    [userId, tokenHash, tokenType, ttlMs],
+  );
+  return result.rows[0];
 }
 
 async function createSession(client, user, tokenOptions) {

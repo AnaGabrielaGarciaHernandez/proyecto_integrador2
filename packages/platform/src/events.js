@@ -129,6 +129,7 @@ function startOutboxWorker({ db, bus, serviceName, intervalMs = 1000, batchSize 
           `SELECT event_id, event_type, correlation_id, payload, attempts
            FROM message_outbox
            WHERE processed_at IS NULL
+             AND next_attempt_at <= now()
            ORDER BY created_at
            FOR UPDATE SKIP LOCKED
            LIMIT $1`,
@@ -138,11 +139,18 @@ function startOutboxWorker({ db, bus, serviceName, intervalMs = 1000, batchSize 
           const event = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
           try {
             await bus.publish(row.event_type, event);
-            await client.query('UPDATE message_outbox SET processed_at = now(), last_error = NULL WHERE event_id = $1', [row.event_id]);
+            await client.query(
+              'UPDATE message_outbox SET processed_at = now(), last_error = NULL, next_attempt_at = now() WHERE event_id = $1',
+              [row.event_id],
+            );
             console.log(`[${serviceName}] correlation_id=${row.correlation_id} event_type=${row.event_type} step=outbox_published`);
           } catch (error) {
             await client.query(
-              'UPDATE message_outbox SET attempts = attempts + 1, last_error = $2 WHERE event_id = $1',
+              `UPDATE message_outbox
+               SET attempts = attempts + 1,
+                   last_error = $2,
+                   next_attempt_at = now() + (LEAST(60000, 250 * power(2, LEAST(attempts + 1, 8))) * interval '1 millisecond')
+               WHERE event_id = $1`,
               [row.event_id, error.message],
             );
             safeLog('error', serviceName, {
@@ -197,6 +205,9 @@ async function startConsumer({ db, bus, serviceName, queue, bindings, handler, m
       const eventType = event?.event_type || message.fields.routingKey || 'unknown';
       try {
         if (retries < maxRetries) {
+          const delayMs = Math.min(30_000, 250 * (2 ** retries))
+            + Math.floor(Math.random() * 250);
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
           await bus.publishToQueue(queue, message.content, {
             contentType: 'application/json',
             messageId: message.properties.messageId,

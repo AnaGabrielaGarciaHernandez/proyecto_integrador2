@@ -15,8 +15,17 @@ const { createAuthRouter } = require('./routes/auth.routes');
 const { createInternalRouter } = require('./routes/internal.routes');
 const { createAvatarStorage } = require('./services/avatar-storage');
 const { createPrivacyCoordinator } = require('./services/privacy');
+const { createEmailService } = require('./services/email');
 
-function createApp({ db, config, privateKey, googleClient, avatarStorage, privacyCoordinator } = {}) {
+function createApp({
+  db,
+  config,
+  privateKey,
+  googleClient,
+  avatarStorage,
+  privacyCoordinator,
+  emailService,
+} = {}) {
   if (!db || !config || !privateKey) {
     throw new Error('createApp requires db, config and privateKey');
   }
@@ -36,6 +45,7 @@ function createApp({ db, config, privateKey, googleClient, avatarStorage, privac
       avatarStorage: resolvedAvatarStorage,
     })
     : privacyCoordinator;
+  const resolvedEmailService = emailService || createEmailService(config);
   const app = express();
   app.locals.privacyCoordinator = resolvedPrivacyCoordinator;
   app.disable('x-powered-by');
@@ -68,6 +78,7 @@ function createApp({ db, config, privateKey, googleClient, avatarStorage, privac
     requireAuth,
     avatarStorage: resolvedAvatarStorage,
     privacyCoordinator: resolvedPrivacyCoordinator,
+    emailService: resolvedEmailService,
   }));
   app.use('/internal', createInternalRouter({
     db,

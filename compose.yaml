@@ -50,6 +50,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-bd_EcoBazar}
       POSTGRES_USER: ${POSTGRES_USER:-ecobazar_admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecobazar_admin_dev}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-identity_dev}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:-catalog_dev}
+      CART_DB_PASSWORD: ${CART_DB_PASSWORD:-cart_dev}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:-ordering_dev}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:-payment_dev}
+      MODERATION_DB_PASSWORD: ${MODERATION_DB_PASSWORD:-moderation_dev}
     volumes:
       - postgres-data:/var/lib/postgresql
     ports:
@@ -114,9 +120,15 @@ services:
     environment:
       <<: *common-environment
       PORT: 4001
-      DATABASE_URL: postgres://ecobazar_identity:identity_dev@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}
+      DATABASE_URL: ${IDENTITY_DATABASE_URL:-postgres://ecobazar_identity:${IDENTITY_DB_PASSWORD:-identity_dev}@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}}
       COOKIE_NAME: ${COOKIE_NAME:-ecobazar_session}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:5173}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_SERVER_KEY: ${SUPABASE_SERVER_KEY:-}
       SUPABASE_AVATAR_BUCKET: ${SUPABASE_AVATAR_BUCKET:-avatars}
@@ -146,7 +158,7 @@ services:
     environment:
       <<: *common-environment
       PORT: 4002
-      DATABASE_URL: postgres://ecobazar_catalog:catalog_dev@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}
+      DATABASE_URL: ${CATALOG_DATABASE_URL:-postgres://ecobazar_catalog:${CATALOG_DB_PASSWORD:-catalog_dev}@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}}
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_SERVER_KEY: ${SUPABASE_SERVER_KEY:-}
       SUPABASE_PRODUCT_IMAGES_BUCKET: ${SUPABASE_PRODUCT_IMAGES_BUCKET:-product-images}
@@ -164,7 +176,7 @@ services:
     environment:
       <<: *common-environment
       PORT: 4003
-      DATABASE_URL: postgres://ecobazar_cart:cart_dev@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}
+      DATABASE_URL: ${CART_DATABASE_URL:-postgres://ecobazar_cart:${CART_DB_PASSWORD:-cart_dev}@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}}
       CATALOG_SERVICE_URL: http://catalog-service:4002
 
   order-service:
@@ -175,7 +187,7 @@ services:
     environment:
       <<: *common-environment
       PORT: 4004
-      DATABASE_URL: postgres://ecobazar_ordering:ordering_dev@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}
+      DATABASE_URL: ${ORDER_DATABASE_URL:-postgres://ecobazar_ordering:${ORDER_DB_PASSWORD:-ordering_dev}@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}}
       CART_SERVICE_URL: http://cart-service:4003
       CATALOG_SERVICE_URL: http://catalog-service:4002
       PAYMENT_SERVICE_URL: http://payment-service:4005
@@ -188,9 +200,10 @@ services:
     environment:
       <<: *common-environment
       PORT: 4005
-      DATABASE_URL: postgres://ecobazar_payment:payment_dev@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}
+      DATABASE_URL: ${PAYMENT_DATABASE_URL:-postgres://ecobazar_payment:${PAYMENT_DB_PASSWORD:-payment_dev}@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:5173}
 
   moderation-service:
     <<: *service-common
@@ -200,7 +213,7 @@ services:
     environment:
       <<: *common-environment
       PORT: 4006
-      DATABASE_URL: postgres://ecobazar_moderation:moderation_dev@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}
+      DATABASE_URL: ${MODERATION_DATABASE_URL:-postgres://ecobazar_moderation:${MODERATION_DB_PASSWORD:-moderation_dev}@postgres:5432/${POSTGRES_DB:-bd_EcoBazar}}
 
   api-gateway:
     <<: *service-common

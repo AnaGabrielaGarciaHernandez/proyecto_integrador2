@@ -102,7 +102,7 @@ export default function LoginScreen() {
         </div>
 
         <div className="login-olvide">
-          <a href="#">¿Olvidaste tu contraseña?</a>
+          <Link to="/recuperar">¿Olvidaste tu contraseña?</Link>
         </div>
 
         <button className="btn-login-principal" onClick={handleLogin} disabled={cargando}>

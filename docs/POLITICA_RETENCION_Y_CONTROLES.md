@@ -31,7 +31,7 @@ Esta política implementa criterios técnicos para EcoBazar y complementa el avi
 | Logs de aplicación | 30 días | Supresión automática, salvo incidente abierto o `legal hold` documentado | Infraestructura de contenedores |
 | Logs de seguridad y privacidad | 12 meses | Supresión o disociación al vencer el plazo | Infraestructura / Identity service |
 | Buckets de rate limiting | Dos ventanas después de su última actualización | Limpieza automática | Cada servicio, PostgreSQL |
-| Backups | Según la ventana operativa contratada | Expiración criptográfica o borrado conforme a la plataforma | Infraestructura; pendiente de habilitar producción |
+| Backups | Según la ventana operativa contratada | Expiración criptográfica o borrado conforme a la plataforma | Infraestructura; Restic hacia almacenamiento S3-compatible |
 
 Los periodos de pedidos, pagos, logs de seguridad y respaldos son objetivos operativos iniciales; se deben sustituir por el plazo concreto que resulte de las obligaciones aplicables a la operación real.
 
@@ -80,11 +80,10 @@ Las excepciones de retención deben documentarse como `legal_hold`, con finalida
 
 ## Backups y restauración
 
-El diseño de backups cifrados, pruebas de restauración y reconciliación de solicitudes de eliminación queda fuera de esta primera implementación. Antes de producción se deberá definir:
+La implementación incluye backups cifrados con Restic, exportación de PostgreSQL y descarga de objetos Supabase configurados. Antes de aceptar tráfico real se deberá definir y probar:
 
 - proveedor, región y cifrado;
 - ventana y retención de snapshots;
 - control de acceso y registro de restauraciones;
 - procedimiento para volver a aplicar eliminaciones después de restaurar;
 - prueba periódica de RPO/RTO y evidencia de resultado.
-

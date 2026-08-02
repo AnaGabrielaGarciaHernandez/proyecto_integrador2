@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
+import { publicConfig } from '../config/public'
 import '../styles/PrivacidadScreen.css'
 
 export default function PrivacidadScreen() {
@@ -9,7 +10,7 @@ export default function PrivacidadScreen() {
         <Link to="/" className="privacidad-back-link">
           <ArrowLeft size={16} /> Volver a EcoBazar
         </Link>
-        <span className="privacidad-version">Versión 1.0.0 · 25/07/2026</span>
+        <span className="privacidad-version">Versión 1.1.0 · 31/07/2026</span>
       </div>
 
       <header className="privacidad-hero">
@@ -24,7 +25,7 @@ export default function PrivacidadScreen() {
       <section className="privacidad-card privacidad-notice">
         <h2>Aviso simplificado</h2>
         <p>
-          <strong>[RAZÓN SOCIAL]</strong>, con domicilio en <strong>[DOMICILIO]</strong>,
+          <strong>{publicConfig.companyName}</strong>, con domicilio en <strong>{publicConfig.legalAddress}</strong>,
           es responsable del tratamiento de tus datos personales. Usamos tu nombre,
           correo, teléfono opcional, foto de perfil, información de compras y datos
           técnicos de sesión para crear y proteger tu cuenta, operar EcoBazar,
@@ -38,7 +39,7 @@ export default function PrivacidadScreen() {
         </p>
         <p>
           Para conocer el aviso integral, ejercer derechos ARCO o revocar tu consentimiento,
-          escribe a <a href="mailto:[CORREO PRIVACIDAD]">[CORREO PRIVACIDAD]</a>.
+          escribe a <a href={`mailto:${publicConfig.privacyEmail}`}>{publicConfig.privacyEmail}</a>.
           También puedes descargar una copia de tus datos o solicitar la eliminación
           desde <Link to="/cuenta">Cuenta</Link>.
         </p>
@@ -49,7 +50,7 @@ export default function PrivacidadScreen() {
         <ul>
           <li>Identificación y contacto: nombre, correo y teléfono opcional.</li>
           <li>Cuenta y preferencias: rol, foto de perfil y configuración.</li>
-          <li>Operación: carrito, productos publicados, pedidos, reseñas y soporte.</li>
+          <li>Operación: carrito, productos publicados, pedidos y soporte.</li>
           <li>Pagos: referencias de transacción y estado; los datos completos de tarjeta no se almacenan en EcoBazar.</li>
           <li>Técnicos y seguridad: sesión, correlación de solicitudes, registros mínimos y controles contra abuso.</li>
         </ul>
@@ -94,7 +95,7 @@ export default function PrivacidadScreen() {
         <h2>Tus derechos</h2>
         <p>
           Puedes solicitar acceso, rectificación, cancelación u oposición (ARCO), así como
-          revocar consentimientos, mediante <a href="mailto:[CORREO PRIVACIDAD]">[CORREO PRIVACIDAD]</a>.
+          revocar consentimientos, mediante <a href={`mailto:${publicConfig.privacyEmail}`}>{publicConfig.privacyEmail}</a>.
           La solicitud deberá permitir verificar tu identidad y localizar los datos.
           Responderemos en los plazos previstos por la LFPDPPP vigente y podremos pedir
           información adicional cuando sea necesario.

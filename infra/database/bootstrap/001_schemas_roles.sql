@@ -3,19 +3,6 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-SELECT 'CREATE ROLE ecobazar_identity LOGIN PASSWORD ''identity_dev'' NOINHERIT'
-WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ecobazar_identity')\gexec
-SELECT 'CREATE ROLE ecobazar_catalog LOGIN PASSWORD ''catalog_dev'' NOINHERIT'
-WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ecobazar_catalog')\gexec
-SELECT 'CREATE ROLE ecobazar_cart LOGIN PASSWORD ''cart_dev'' NOINHERIT'
-WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ecobazar_cart')\gexec
-SELECT 'CREATE ROLE ecobazar_ordering LOGIN PASSWORD ''ordering_dev'' NOINHERIT'
-WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ecobazar_ordering')\gexec
-SELECT 'CREATE ROLE ecobazar_payment LOGIN PASSWORD ''payment_dev'' NOINHERIT'
-WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ecobazar_payment')\gexec
-SELECT 'CREATE ROLE ecobazar_moderation LOGIN PASSWORD ''moderation_dev'' NOINHERIT'
-WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ecobazar_moderation')\gexec
-
 CREATE SCHEMA IF NOT EXISTS identity AUTHORIZATION ecobazar_identity;
 CREATE SCHEMA IF NOT EXISTS catalog AUTHORIZATION ecobazar_catalog;
 CREATE SCHEMA IF NOT EXISTS cart AUTHORIZATION ecobazar_cart;

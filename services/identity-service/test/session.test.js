@@ -65,7 +65,7 @@ test('rejects a session issued for another audience', () => {
   }), /audience/i);
 });
 
-test('uses secure cross-site cookies only in production', () => {
+test('uses secure same-origin cookies in production', () => {
   assert.deepEqual(sessionCookieOptions('development'), {
     httpOnly: true,
     sameSite: 'lax',
@@ -74,7 +74,7 @@ test('uses secure cross-site cookies only in production', () => {
   });
   assert.deepEqual(sessionCookieOptions('production'), {
     httpOnly: true,
-    sameSite: 'none',
+    sameSite: 'lax',
     secure: true,
     path: '/',
   });

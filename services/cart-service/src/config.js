@@ -1,6 +1,7 @@
 const path = require('node:path');
 const dotenv = require('dotenv');
 const { z } = require('zod');
+const { assertNotDevelopmentDefault } = require('@ecobazar/platform');
 
 dotenv.config({ path: path.join(__dirname, '..', '.env'), quiet: true });
 
@@ -19,7 +20,9 @@ const EnvSchema = z.object({
 });
 
 function loadConfig(source = process.env) {
-  return EnvSchema.parse(source);
+  const config = EnvSchema.parse(source);
+  assertNotDevelopmentDefault(config, ['INTERNAL_SERVICE_TOKEN', 'RATE_LIMIT_HASH_KEY', 'RABBITMQ_URL']);
+  return config;
 }
 
 module.exports = { loadConfig };

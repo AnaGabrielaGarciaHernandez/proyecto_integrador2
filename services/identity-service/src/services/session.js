@@ -46,7 +46,7 @@ function getSessionToken(req, cookieName) {
 function sessionCookieOptions(nodeEnv) {
   return {
     httpOnly: true,
-    sameSite: nodeEnv === 'production' ? 'none' : 'lax',
+    sameSite: 'lax',
     secure: nodeEnv === 'production',
     path: '/',
   };

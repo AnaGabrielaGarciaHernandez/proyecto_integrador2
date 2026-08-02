@@ -68,6 +68,7 @@ export function AuthProvider({ children }) {
   const register = useCallback(async ({ full_name, email, password, phone }) => {
     invalidatePendingPreferences()
     const data = await post('/auth/register', { full_name, email, password, phone })
+    if (data.verification_required) return data
     commitSessionUser(data.user)
     window.dispatchEvent(new Event('authActualizado'))
     return data.user

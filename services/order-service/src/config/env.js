@@ -1,6 +1,7 @@
 const path = require('node:path');
 const dotenv = require('dotenv');
 const { z } = require('zod');
+const { assertNotDevelopmentDefault } = require('@ecobazar/platform');
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env'), quiet: true });
 
@@ -30,4 +31,6 @@ if (!parsed.success) {
   throw new Error(`Invalid order-service environment: ${details}`);
 }
 
-module.exports = parsed.data;
+const config = parsed.data;
+assertNotDevelopmentDefault(config, ['INTERNAL_SERVICE_TOKEN', 'RATE_LIMIT_HASH_KEY', 'RABBITMQ_URL']);
+module.exports = config;

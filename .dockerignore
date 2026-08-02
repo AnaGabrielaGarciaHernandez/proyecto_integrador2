@@ -1,6 +1,8 @@
 .git
 .secrets
 **/.env
+**/.env.*
+**/.env.production
 **/node_modules
 **/dist
 coverage

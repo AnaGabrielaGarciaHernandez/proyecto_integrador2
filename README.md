@@ -28,7 +28,7 @@ flowchart LR
 
 La explicación completa de servicios, schemas, APIs, Saga, Stripe, Outbox/Inbox, eventos, base de datos y operación está en [DOCUMENTACION_TECNICA.md](DOCUMENTACION_TECNICA.md).
 
-La documentación de privacidad, retención y controles de datos está en [aviso simplificado](docs/AVISO_PRIVACIDAD_SIMPLIFICADO.md), [aviso integral](docs/AVISO_PRIVACIDAD_INTEGRAL.md) y [política de retención](docs/POLITICA_RETENCION_Y_CONTROLES.md). Antes de producción se deben sustituir los campos entre corchetes y validar los plazos con asesoría legal.
+La documentación de privacidad, retención y controles de datos está en [aviso simplificado](docs/AVISO_PRIVACIDAD_SIMPLIFICADO.md), [aviso integral](docs/AVISO_PRIVACIDAD_INTEGRAL.md) y [política de retención](docs/POLITICA_RETENCION_Y_CONTROLES.md). La guía de despliegue y operación VPS está en [OPERACION_PRODUCCION.md](docs/OPERACION_PRODUCCION.md); los datos legales reales se inyectan mediante `.env.production` y deben validarse con asesoría legal.
 
 ## Requisitos
 

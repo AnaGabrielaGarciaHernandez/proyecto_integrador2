@@ -32,6 +32,27 @@
   line-height: 1.5;
 }
 
+.registro-verificacion {
+  margin: 0 0 20px;
+  padding: 16px;
+  border: 1px solid #b8d8c4;
+  border-radius: 12px;
+  background: #effaf2;
+  color: #1b4332;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.registro-verificacion p {
+  margin: 6px 0 10px;
+}
+
+.registro-verificacion a {
+  color: #1b4332;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .registro-campo {
   display: flex;
   flex-direction: column;

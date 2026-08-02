@@ -21,7 +21,7 @@ Admin fue implementado en `moderation-service` (orquestador de administración d
 
 EcoBazar es una plataforma de moda circular. Permite consultar prendas, mantener un carrito, reservar inventario, pagar mediante Stripe Checkout y consultar compras o ventas. La entrega es únicamente por recolección presencial y no tiene costo de envío.
 
-En esta iteración EcoBazar cobra cada pedido completo en una sola cuenta de Stripe. Stripe Connect, reparto de fondos, payouts, reembolsos, devoluciones y programación de pickup no forman parte del alcance.
+En esta iteración EcoBazar cobra cada pedido completo en una sola cuenta de Stripe. Stripe Connect, reparto de fondos, payouts, reembolsos automáticos y devoluciones garantizadas no forman parte del alcance. La recogida presencial sí está implementada mediante puntos y horarios configurables.
 
 ## Stack Técnico
 
@@ -66,7 +66,7 @@ flowchart LR
 
 El navegador sólo conoce `http://localhost:4000/api`. El Gateway decide qué servicio posee cada ruta. Los puertos de los servicios de dominio no se publican al host; sólo son accesibles dentro de la red de Compose.
 
-PostgreSQL y RabbitMQ sí publican puertos para diagnóstico durante desarrollo. Esta configuración no debe copiarse sin endurecimiento a producción.
+PostgreSQL y RabbitMQ publican puertos únicamente en el Compose de desarrollo. `compose.production.yaml` los deja privados y expone solo 80/443 mediante Caddy.
 
 ## Componentes
 
@@ -148,9 +148,11 @@ El Gateway aplica `helmet`, CORS con credenciales, correlation ID y proxy HTTP. 
 4. Consulta a Identity para confirmar que la sesión no fue revocada y que el usuario sigue activo.
 5. Añade headers de identidad confiables y un `x-correlation-id` interno.
 
-Identity posee la clave privada. Gateway sólo monta la clave pública. El job `jwt-keys` genera ambas la primera vez y las guarda en el volumen `jwt-keys`.
+En producción también valida `Origin`/`Referer` para mutaciones autenticadas por cookie, aplica un límite global por IP y publica cookies `Secure`/`SameSite=Lax` detrás de Caddy.
 
-En desarrollo, la cookie usa `HttpOnly`, `SameSite=Lax` y no requiere HTTPS. En producción cambia a `SameSite=None` y `Secure`.
+Identity posee la clave privada. Gateway sólo monta la clave pública. En desarrollo el job `jwt-keys` genera ambas la primera vez; en producción se monta `.secrets` y el job falla si el par existente no está completo.
+
+En desarrollo, la cookie usa `HttpOnly`, `SameSite=Lax` y no requiere HTTPS. En producción conserva `SameSite=Lax` y usa `Secure`, porque frontend y API comparten origen detrás de Caddy.
 
 Las llamadas REST entre servicios requieren `x-internal-token` y usan comparación de tiempo constante. El Gateway no monta un body parser antes del proxy, por lo que conserva los bytes originales del webhook de Stripe y también permite transportar multipart sin alterarlo.
 
@@ -158,9 +160,13 @@ Las llamadas REST entre servicios requieren `x-internal-token` y usan comparaci�
 
 | Método y ruta | Servicio | Autenticación | Descripción |
 |---|---|---|---|
-| `POST /api/auth/register` | Identity | No | Registro y creación de sesión |
+| `POST /api/auth/register` | Identity | No | Registro y envío de verificación por correo; responde `202` sin sesión |
 | `POST /api/auth/login` | Identity | No | Login con email y contraseña |
 | `POST /api/auth/google` | Identity | No | Login o registro con Google |
+| `POST /api/auth/verify-email` | Identity | No | Consume un token de verificación de un solo uso |
+| `POST /api/auth/resend-verification` | Identity | No | Reenvía verificación con respuesta genérica |
+| `POST /api/auth/forgot-password` | Identity | No | Solicita recuperación sin enumerar cuentas |
+| `POST /api/auth/reset-password` | Identity | No | Cambia contraseña con token de un solo uso |
 | `POST /api/auth/logout` | Identity | Sesión | Revoca sesión y elimina cookie |
 | `GET /api/auth/me` | Identity | Sesión | Usuario actual |
 | `PATCH /api/auth/preferences` | Identity | Sesión | Actualiza las preferencias de la cuenta actual |
@@ -404,7 +410,7 @@ Cada consumidor inserta `event_id` en `message_inbox` dentro de la misma transac
 - Cada cola tiene su correspondiente `.dlq`.
 - Mensajes persistentes, acknowledgements manuales y publisher confirms.
 
-Si un handler falla, el mensaje se republica directamente con `x-retry-count` incrementado. Después de cinco reintentos se publica en la DLQ y se registra un `console.error`. No hay backoff exponencial, TTL escalonado ni plugins adicionales.
+Si un handler falla, el mensaje se republica con `x-retry-count` incrementado y backoff exponencial acotado. Después de cinco reintentos se publica en la DLQ y se registra un evento operativo. El outbox también persiste `next_attempt_at` para evitar reintentos calientes.
 
 Envelope:
 
@@ -437,7 +443,7 @@ Envelope:
 
 ## Logs Y Correlación
 
-No existe un sistema externo de observabilidad. Cada petición, evento y transición escribe por consola:
+La instrumentación base expone métricas Prometheus del gateway en `/metrics` dentro de la red privada. Cada petición, evento y transición escribe por consola:
 
 ```text
 [order-service] correlation_id=<uuid> event_type=<tipo> step=<paso>

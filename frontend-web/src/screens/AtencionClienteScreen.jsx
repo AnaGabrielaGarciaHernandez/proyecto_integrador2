@@ -7,19 +7,20 @@ import {
   ChevronDown
 } from 'lucide-react'
 import '../styles/AtencionClienteScreen.css'
+import { publicConfig } from '../config/public'
 
 const canales = [
   {
     icon: MessageCircle,
     titulo: 'WhatsApp',
     texto: 'Respuesta rápida para dudas sobre pedidos, entregas y pagos.',
-    detalle: '+52 618 123 4567'
+    detalle: publicConfig.supportPhone
   },
   {
     icon: Mail,
     titulo: 'Correo',
     texto: 'Envíanos tus comentarios o solicitudes de soporte.',
-    detalle: 'soporte@ecobazar.com'
+    detalle: publicConfig.supportEmail
   },
   {
     icon: Clock3,

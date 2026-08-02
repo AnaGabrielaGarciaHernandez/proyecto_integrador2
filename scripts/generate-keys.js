@@ -21,6 +21,10 @@ if (privateKeyExists || publicKeyExists) {
   );
 }
 
+if (process.env.NODE_ENV === 'production') {
+  throw new Error(`Production requires an existing complete RS256 key pair in ${target}`);
+}
+
 const { privateKey, publicKey } = generateKeyPairSync('rsa', {
   modulusLength: 2048,
   publicKeyEncoding: { type: 'spki', format: 'pem' },

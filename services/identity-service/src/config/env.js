@@ -1,6 +1,7 @@
 const path = require('node:path');
 const dotenv = require('dotenv');
 const { z } = require('zod');
+const { assertNotDevelopmentDefault, assertProductionConfig } = require('@ecobazar/platform');
 
 const optionalUrl = z.union([z.literal(''), z.string().url()]);
 
@@ -21,6 +22,14 @@ const envSchema = z.object({
   JWT_ISSUER: z.string().min(1).default('ecobazar-identity'),
   JWT_AUDIENCE: z.string().min(1).default('ecobazar-api'),
   COOKIE_NAME: z.string().min(1).default('ecobazar_session'),
+  PUBLIC_APP_URL: optionalUrl.default('http://localhost:5173'),
+  SMTP_HOST: z.string().optional().default(''),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().optional().default(''),
+  SMTP_PASS: z.string().optional().default(''),
+  SMTP_FROM: z.string().optional().default(''),
+  EMAIL_VERIFICATION_TTL_MS: z.coerce.number().int().positive().default(86400000),
+  PASSWORD_RESET_TTL_MS: z.coerce.number().int().positive().default(1800000),
   GOOGLE_CLIENT_ID: z.string().optional().default(''),
   INTERNAL_SERVICE_TOKENS: z.string().optional().default(''),
   INTERNAL_SERVICE_TOKEN: z.string().optional().default(''),
@@ -40,6 +49,8 @@ const envSchema = z.object({
   LOGIN_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),
   REGISTER_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   REGISTER_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(3600000),
+  EMAIL_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
+  EMAIL_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),
   GOOGLE_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
   GOOGLE_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(3600000),
   PRIVACY_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(6),
@@ -63,9 +74,23 @@ if (!parsed.success) {
   throw new Error(`Invalid identity-service configuration: ${details}`);
 }
 
-if (parsed.data.NODE_ENV === 'production'
-  && (!parsed.data.SUPABASE_URL || !parsed.data.SUPABASE_SERVER_KEY)) {
+const config = parsed.data;
+
+if (config.NODE_ENV === 'production'
+  && (!config.SUPABASE_URL || !config.SUPABASE_SERVER_KEY)) {
   throw new Error('SUPABASE_URL and SUPABASE_SERVER_KEY are required in production');
 }
 
-module.exports = parsed.data;
+assertProductionConfig(config, {
+  required: ['PUBLIC_APP_URL', 'SMTP_HOST', 'SMTP_FROM'],
+  httpsUrls: ['PUBLIC_APP_URL', 'SUPABASE_URL'],
+});
+assertNotDevelopmentDefault(config, ['RATE_LIMIT_HASH_KEY', 'INTERNAL_SERVICE_TOKEN']);
+
+if (config.NODE_ENV === 'production'
+  && !config.INTERNAL_SERVICE_TOKENS
+  && !config.INTERNAL_SERVICE_TOKEN) {
+  throw new Error('INTERNAL_SERVICE_TOKENS or INTERNAL_SERVICE_TOKEN is required in production');
+}
+
+module.exports = config;

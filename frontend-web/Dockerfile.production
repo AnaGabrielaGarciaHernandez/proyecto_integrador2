@@ -1,0 +1,33 @@
+FROM node:24-alpine AS build
+
+WORKDIR /app
+
+ARG VITE_API_URL=/api
+ARG VITE_GOOGLE_CLIENT_ID=
+ARG VITE_LEGAL_COMPANY_NAME=EcoBazar
+ARG VITE_LEGAL_ADDRESS=
+ARG VITE_PRIVACY_EMAIL=privacidad@ecobazar.com
+ARG VITE_SUPPORT_EMAIL=soporte@ecobazar.com
+ARG VITE_SUPPORT_PHONE=
+
+ENV VITE_API_URL=$VITE_API_URL \
+    VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID \
+    VITE_LEGAL_COMPANY_NAME=$VITE_LEGAL_COMPANY_NAME \
+    VITE_LEGAL_ADDRESS=$VITE_LEGAL_ADDRESS \
+    VITE_PRIVACY_EMAIL=$VITE_PRIVACY_EMAIL \
+    VITE_SUPPORT_EMAIL=$VITE_SUPPORT_EMAIL \
+    VITE_SUPPORT_PHONE=$VITE_SUPPORT_PHONE
+
+COPY frontend-web/package*.json ./frontend-web/
+WORKDIR /app/frontend-web
+RUN npm ci --no-audit --no-fund
+COPY frontend-web/ ./
+RUN npm run build
+
+FROM nginx:1.29-alpine
+
+COPY frontend-web/nginx.production.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/frontend-web/dist /usr/share/nginx/html
+
+EXPOSE 80
+HEALTHCHECK --interval=10s --timeout=3s --retries=6 CMD wget -qO- http://127.0.0.1/healthz >/dev/null || exit 1

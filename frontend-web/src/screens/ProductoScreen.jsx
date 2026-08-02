@@ -338,7 +338,7 @@ export default function ProductoScreen() {
 
           <div className="garantia-item">
             <RotateCcw size={18} />
-            <span>15 días devolución</span>
+            <span>Incidencias revisadas por soporte</span>
           </div>
 
         </div>

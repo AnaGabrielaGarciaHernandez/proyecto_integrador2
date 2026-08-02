@@ -17,6 +17,10 @@ import OrdersScreen from '../screens/OrdersScreen'
 import AtencionClienteScreen from '../screens/AtencionClienteScreen'
 import WishlistScreen from '../screens/WishlistScreen'
 import PrivacidadScreen from '../screens/PrivacidadScreen'
+import TerminosScreen from '../screens/TerminosScreen'
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen'
+import EmailActionScreen from '../screens/EmailActionScreen'
+import NotFoundScreen from '../screens/NotFoundScreen'
 import { CheckoutSuccessScreen, CheckoutCancelledScreen } from '../screens/CheckoutStatusScreen'
 
 export default function AppRouter() {
@@ -35,17 +39,22 @@ export default function AppRouter() {
         <Route path="/producto/:id" element={<ProductoScreen />} />
         <Route path="/login"        element={<LoginScreen />} />
         <Route path="/registro"     element={<RegistroScreen />} />
+        <Route path="/recuperar"    element={<ForgotPasswordScreen />} />
+        <Route path="/verificar-email" element={<EmailActionScreen mode="verify" />} />
+        <Route path="/restablecer-contrasena" element={<EmailActionScreen mode="reset" />} />
         <Route path="/vender"       element={<VenderScreen />} />
         <Route path="/panel-vendedor" element={<PanelVendedorScreen />} />
         <Route path="/mis-direcciones" element={<PickupPointsScreen />} />
         <Route path="/soporte"      element={<AtencionClienteScreen />} />
         <Route path="/privacidad"  element={<PrivacidadScreen />} />
+        <Route path="/terminos"    element={<TerminosScreen />} />
         <Route element={<AdminRoute />}>
           <Route path="/admin/usuarios"    element={<AdminScreen />} />
           <Route path="/admin/solicitudes" element={<AdminScreen />} />
           <Route path="/admin/reportes"    element={<AdminScreen />} />
         </Route>
       </Route>
+      <Route path="*" element={<NotFoundScreen />} />
     </Routes>
   )
 }

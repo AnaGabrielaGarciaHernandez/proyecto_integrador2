@@ -1,6 +1,7 @@
 const path = require('node:path');
 const dotenv = require('dotenv');
 const { z } = require('zod');
+const { assertNotDevelopmentDefault, assertProductionConfig } = require('@ecobazar/platform');
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env'), quiet: true });
 
@@ -28,4 +29,16 @@ if (!parsed.success) {
   throw new Error(`Invalid payment-service environment: ${details}`);
 }
 
-module.exports = parsed.data;
+const config = parsed.data;
+assertProductionConfig(config, {
+  required: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'],
+  httpsUrls: ['CLIENT_ORIGIN'],
+});
+assertNotDevelopmentDefault(config, ['INTERNAL_SERVICE_TOKEN', 'RATE_LIMIT_HASH_KEY']);
+if (config.NODE_ENV === 'production'
+  && (!config.STRIPE_SECRET_KEY.startsWith('sk_')
+    || !config.STRIPE_WEBHOOK_SECRET.startsWith('whsec_'))) {
+  throw new Error('Production Stripe credentials have an invalid format');
+}
+
+module.exports = config;

@@ -49,7 +49,7 @@ services:
     environment:
       NODE_ENV: production
       JWT_KEYS_DIR: /run/secrets
-    volumes: !reset
+    volumes: !override
       - ./.secrets:/run/secrets:ro
 
   identity-service:
@@ -69,7 +69,7 @@ services:
       SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
       SUPABASE_SERVER_KEY: ${SUPABASE_SERVER_KEY:?SUPABASE_SERVER_KEY is required}
       JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-private.pem
-    volumes: !reset
+    volumes: !override
       - ./.secrets:/run/secrets:ro
 
   catalog-service:
@@ -125,7 +125,7 @@ services:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       RATE_LIMIT_HASH_KEY: ${RATE_LIMIT_HASH_KEY:?RATE_LIMIT_HASH_KEY is required}
       JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
-    volumes: !reset
+    volumes: !override
       - ./.secrets:/run/secrets:ro
 
   frontend-web:

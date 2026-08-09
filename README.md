@@ -30,6 +30,153 @@ La explicación completa de servicios, schemas, APIs, Saga, Stripe, Outbox/Inbox
 
 La documentación de privacidad, retención y controles de datos está en [aviso simplificado](docs/AVISO_PRIVACIDAD_SIMPLIFICADO.md), [aviso integral](docs/AVISO_PRIVACIDAD_INTEGRAL.md) y [política de retención](docs/POLITICA_RETENCION_Y_CONTROLES.md). La guía de despliegue y operación VPS está en [OPERACION_PRODUCCION.md](docs/OPERACION_PRODUCCION.md); los datos legales reales se inyectan mediante `.env.production` y deben validarse con asesoría legal.
 
+## Guía rápida de producción en Google Cloud
+
+La aplicación de producción corre en la VM `ecobazar-production`, zona `us-central1-a`, y se publica en `https://app.eco-bazar.store`. La guía completa de respaldos, restauración, despliegues automatizados y operación está en [docs/OPERACION_PRODUCCION.md](docs/OPERACION_PRODUCCION.md).
+
+### Entrar a la VM
+
+Desde Cloud Shell o desde un equipo que tenga instalada la CLI de Google Cloud, ejecuta el comando completo en una sola línea:
+
+```bash
+gcloud compute ssh ecobazar-production --project=eco-bazar-502223 --zone=us-central1-a
+```
+
+Si el proyecto no está configurado en Cloud Shell, puedes dejarlo establecido una vez:
+
+```bash
+gcloud config set project eco-bazar-502223
+```
+
+Después de entrar a la VM, ve a la carpeta de producción:
+
+```bash
+cd /opt/ecobazar/proyecto_integrador2
+```
+
+No guardes `.env.production`, `.secrets` ni claves de terceros en GitHub. Esos archivos deben permanecer únicamente en la VM.
+
+### Levantar la página
+
+Para iniciar los contenedores existentes sin reconstruir imágenes:
+
+```bash
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml up -d
+```
+
+Para desplegar cambios nuevos desde `main`, usa:
+
+```bash
+git pull --ff-only origin main
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml config --quiet
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml up -d --build --remove-orphans
+```
+
+Comprueba el estado y la aplicación:
+
+```bash
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml ps
+APP_URL="https://app.eco-bazar.store" ./scripts/smoke-production.sh
+```
+
+El resultado esperado del smoke test es `production smoke checks passed`. Caddy se encarga del HTTPS y de publicar el frontend y el API Gateway.
+
+### Si la página se cae
+
+Primero revisa si la VM está encendida desde Cloud Shell:
+
+```bash
+gcloud compute instances describe ecobazar-production --project=eco-bazar-502223 --zone=us-central1-a --format='get(status)'
+```
+
+Si devuelve `TERMINATED`, enciéndela:
+
+```bash
+gcloud compute instances start ecobazar-production --project=eco-bazar-502223 --zone=us-central1-a
+```
+
+Entra de nuevo por SSH y revisa contenedores, salud y logs:
+
+```bash
+cd /opt/ecobazar/proyecto_integrador2
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml ps
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml logs --tail=100 caddy frontend-web api-gateway
+curl --fail --silent --show-error https://app.eco-bazar.store/health/live
+```
+
+Si los contenedores están detenidos, arráncalos:
+
+```bash
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml up -d
+```
+
+Si sólo falló el frontend o el proxy, puedes reiniciar esos servicios sin reconstruir imágenes:
+
+```bash
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml restart frontend-web caddy
+```
+
+### Diagnósticos frecuentes
+
+Si falla `migrate`, revisa el error antes de volver a arrancar los servicios:
+
+```bash
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml logs --tail=200 migrate
+```
+
+Después de corregir el problema de configuración o credenciales, ejecuta la migración manualmente y vuelve a levantar la aplicación:
+
+```bash
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml run --rm --no-deps migrate
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml up -d
+```
+
+Si falla `jwt-keys`, no generes un par nuevo en producción: el cambio invalidaría los tokens existentes. Revisa los logs y confirma que los archivos estén presentes en `.secrets`; si faltan, restáuralos desde un respaldo seguro.
+
+```bash
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml logs --tail=100 jwt-keys
+ls -l .secrets
+```
+
+### Rollback a una versión conocida
+
+Si un despliegue nuevo rompe la aplicación, identifica el commit estable y vuelve a desplegarlo. Sustituye `<commit-estable>` por el hash que hayas verificado:
+
+```bash
+git fetch origin
+git checkout <commit-estable>
+docker compose --env-file .env.production -f compose.yaml -f compose.production.yaml up -d --build --remove-orphans
+APP_URL="https://app.eco-bazar.store" ./scripts/smoke-production.sh
+```
+
+No ejecutes `docker compose down -v` en producción: elimina volúmenes y puede borrar la base de datos, colas y datos persistentes.
+
+### Respaldos y restauración
+
+El respaldo debe ejecutarse con las variables de Restic configuradas en `.env.production`:
+
+```bash
+ENV_FILE=.env.production ./scripts/backup-production.sh
+```
+
+La restauración sobrescribe datos de producción y sólo debe ejecutarse después de confirmar el snapshot correcto:
+
+```bash
+RESTORE_CONFIRM=YES ENV_FILE=.env.production ./scripts/restore-production.sh
+```
+
+Después de cualquier restauración, ejecuta el smoke test y revisa los logs. La restauración de archivos de Supabase puede requerir una acción adicional según el proveedor.
+
+### Trabajo normal de desarrollo
+
+En tu computadora continúa usando `.env` y únicamente `compose.yaml`:
+
+```bash
+docker compose up --build -d
+```
+
+En producción usa siempre `.env.production` junto con `compose.yaml` y `compose.production.yaml`. Prueba los cambios localmente, súbelos a GitHub y despliega después; nunca copies el `.env` local sobre `.env.production`.
+
 ## Requisitos
 
 Para ejecutar toda la aplicación sólo necesitas:

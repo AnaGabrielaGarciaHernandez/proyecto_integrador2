@@ -24,3 +24,4 @@ build/
 .env.compose
 dogfood-output/
 PLAN_MICROSERVICIOS.md
+GUIA_BACKEND.md
